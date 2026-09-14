@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>備份與恢復控制台</title>
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="icon" type="image/png" sizes="32x32" href="icon-32.png">
+<link rel="manifest" href="manifest.json">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="備份控制台">
+<meta name="theme-color" content="#1565c0">
+<style>
+  :root{
+    --blue:#1565c0; --blue-dark:#0d47a1; --green:#0f6e3a; --ink:#1a1a1a;
+    --muted:#6b6b6b; --bg:#f4f6f9; --card:#ffffff; --border:#e2e6ec;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;
+    background:var(--bg); color:var(--ink); padding:16px; padding-bottom:100px;
+  }
+  h1{font-size:1.25rem; margin:4px 0 2px;}
+  .sub{color:var(--muted); font-size:0.85rem; margin-bottom:16px; line-height:1.6;}
+  .card{
+    background:var(--card); border:1px solid var(--border); border-radius:14px;
+    padding:14px 16px; margin-bottom:12px; display:flex; align-items:center; gap:12px;
+  }
+  .card.disabled{opacity:0.55;}
+  .card input[type=checkbox]{width:22px; height:22px; flex:0 0 auto;}
+  .card .info{flex:1; min-width:0;}
+  .card .name{font-weight:700; font-size:1rem;}
+  .card .desc{font-size:0.78rem; color:var(--muted); margin-top:2px; line-height:1.5;}
+  .card .tag{
+    font-size:0.7rem; padding:2px 8px; border-radius:10px; background:#eef2f8; color:var(--muted);
+    white-space:nowrap;
+  }
+  .toolbar{display:flex; gap:8px; margin:14px 0;}
+  .toolbar button{
+    flex:1; padding:9px 0; border-radius:10px; border:1px solid var(--border);
+    background:#fff; color:var(--ink); font-size:0.85rem; font-weight:700; cursor:pointer;
+  }
+  .bottom-bar{
+    position:fixed; left:0; right:0; bottom:0; background:#fff; border-top:1px solid var(--border);
+    padding:12px 16px; display:flex; gap:10px; box-shadow:0 -4px 16px rgba(0,0,0,.06);
+  }
+  .bottom-bar button{
+    flex:1; padding:13px 0; border:none; border-radius:12px; font-size:0.95rem; font-weight:700;
+    color:#fff; cursor:pointer;
+  }
+  #btn-backup{background:var(--blue);}
+  #btn-restore{background:var(--green);}
+  .hint-box{
+    background:#fff8e1; border:1px solid #ffe082; border-radius:10px; padding:10px 12px;
+    font-size:0.78rem; color:#7a5c00; line-height:1.6; margin-bottom:16px;
+  }
+  .status{
+    font-size:0.8rem; color:var(--muted); margin-top:6px; line-height:1.7; display:none;
+  }
+  .status.show{display:block;}
+  .status b{color:var(--blue-dark);}
+</style>
+</head>
+<body>
+
+  <h1>📦 備份與恢復控制台</h1>
+  <div class="sub">勾選要處理的項目，再點下方「開始備份」或「開始恢復」。每個項目會各自開啟一個分頁，執行該系統原本內建的一鍵備份／恢復功能。</div>
+
+  <div class="hint-box">
+    ⚠️ 手機瀏覽器第一次執行時，可能會跳出「已封鎖快顯視窗」的提示，請點選「允許」，否則只會開啟第一個項目。<br>
+    ⚠️ 恢復時，請先自行找到對應項目的「一鍵備份」JSON檔案存放位置，開啟後在跳出的畫面中依提示選擇該檔案。
+  </div>
+
+  <div id="list"></div>
+
+  <div class="toolbar">
+    <button id="btn-select-all">全選</button>
+    <button id="btn-select-none">全不選</button>
+  </div>
+
+  <div id="status" class="status"></div>
+
+  <div style="height:70px"></div>
+
+  <div class="bottom-bar">
+    <button id="btn-backup">💾 開始備份</button>
+    <button id="btn-restore">📥 開始恢復</button>
+  </div>
+
+<script>
+// ============ 項目清單 ============
+// file: 檔案名稱（需與本控制台放在同一個資料夾）
+// supported: 該檔案是否已具備 autobackup / autorestore 網址參數機制
+const APPS = [
+  { id:'xrb',  name:'蕭氏學人班', file:'index-學人logo.html',   desc:'人員名單／出席記錄／生日 一鍵備份', supported:true },
+  { id:'ztm',  name:'張氏童蒙班', file:'index-童蒙logo_2.html', desc:'人員名單／出席記錄／學員資料 一鍵備份', supported:true },
+  { id:'xqs',  name:'蕭氏青少班', file:'index-青少logo.html',   desc:'人員名單／出席記錄／學員資料 一鍵備份', supported:true },
+  { id:'gs',   name:'公司排程系統', file:'index-公司logo.html', desc:'當月排程／盤點庫存／叫貨一覽表 一鍵備份', supported:true },
+  { id:'sb',   name:'三班報名系統', file:'index-三班logo.html', desc:'各班人員名單 匯出／匯入', supported:true },
+  { id:'th',   name:'茶會帳本', file:'index-茶會logo.html',     desc:'收支紀錄 JSON 備份／匯入', supported:true },
+  { id:'cal',  name:'萬年曆', file:'萬年曆.html',              desc:'行事曆／例行班會／生日／特殊事項 一鍵備份', supported:true },
+  { id:'wild', name:'戶外活動系統', file:'index-戶外logo_2.html', desc:'此系統採雲端自動同步，未提供 JSON 一鍵備份/恢復功能', supported:false },
+];
+
+const listEl = document.getElementById('list');
+APPS.forEach(app => {
+  const card = document.createElement('label');
+  card.className = 'card' + (app.supported ? '' : ' disabled');
+  card.innerHTML = `
+    <input type="checkbox" data-id="${app.id}" ${app.supported ? 'checked' : 'disabled'}>
+    <div class="info">
+      <div class="name">${app.name}</div>
+      <div class="desc">${app.desc}</div>
+    </div>
+    <div class="tag">${app.supported ? '支援' : '不支援'}</div>
+  `;
+  listEl.appendChild(card);
+});
+
+function getSelected(){
+  return APPS.filter(a => a.supported && document.querySelector(`input[data-id="${a.id}"]`).checked);
+}
+
+document.getElementById('btn-select-all').onclick = () => {
+  document.querySelectorAll('input[type=checkbox]:not(:disabled)').forEach(c => c.checked = true);
+};
+document.getElementById('btn-select-none').onclick = () => {
+  document.querySelectorAll('input[type=checkbox]:not(:disabled)').forEach(c => c.checked = false);
+};
+
+function setStatus(html){
+  const s = document.getElementById('status');
+  s.innerHTML = html;
+  s.classList.add('show');
+}
+
+function runBatch(action){
+  const selected = getSelected();
+  if (selected.length === 0) {
+    alert('請至少勾選一個項目');
+    return;
+  }
+  const label = action === 'autobackup' ? '備份' : '恢復';
+
+  // 不使用 window.open 批次開啟（手機瀏覽器通常會封鎖）。
+  // 改為列出可點擊連結，讓使用者逐一點擊，每次點擊都是使用者的直接操作，
+  // 瀏覽器不會視為快顯視窗而封鎖。
+  const links = selected.map((app, i) => {
+    const linkId = `link-${action}-${app.id}`;
+    return `<div style="margin:4px 0;">
+      ${i + 1}. <a id="${linkId}" href="${app.file}?${action}=1" target="_blank"
+        style="color:#1565c0; font-weight:700;"
+        onclick="document.getElementById('${linkId}').style.color='#888';">${app.name}</a>
+    </div>`;
+  }).join('');
+
+  let msg = `請依序點擊下方 <b>${selected.length}</b> 個連結，逐一開啟進行${label}（點過的連結會加上刪除線）：<br>${links}`;
+  if (action === 'autobackup') {
+    msg += `每個分頁會自動下載備份檔並在完成後自動關閉。`;
+  } else {
+    msg += `請在每個分頁跳出的檔案選擇畫面中，選取該項目對應的備份 JSON 檔。`;
+  }
+  setStatus(msg);
+}
+
+document.getElementById('btn-backup').onclick = () => runBatch('autobackup');
+document.getElementById('btn-restore').onclick = () => runBatch('autorestore');
+</script>
+</body>
+</html>
