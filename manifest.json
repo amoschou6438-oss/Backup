@@ -1,7 +1,7 @@
 {
   "name": "備份與恢復控制台",
   "short_name": "備份控制台",
-  "start_url": "./控制台.html",
+  "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#f4f6f9",
   "theme_color": "#1565c0",
