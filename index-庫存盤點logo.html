@@ -625,7 +625,7 @@
   </div>
 
   <h1 class="count-title"><span class="title-logo" role="img" aria-label="庫存盤點 Logo"></span><span class="title-text">得來素庫存盤點</span></h1>
-  <div class="subtitle">依貨品編號前方英文字母分頁（D 類再依第二碼細分子分頁） &middot; 點選任一品項會自動向左展開盤點單位提示 &middot; 名稱與盤點數量皆可直接點擊修改 &middot; 輸入數量後按 Enter，自動跳到下一個空白的盤點數量</div>
+  <div class="subtitle">依貨品編號前方英文字母分頁（D 類再依第二碼細分子分頁） &middot; 點選任一品項會自動向左展開盤點單位提示 &middot; 名稱與盤點數量皆可直接點擊修改 &middot; 輸入數量後按 Enter，自動跳到下一個空白的盤點數量，本分頁輸入完畢會自動跳到下一個分頁</div>
 
   <div class="toolbar">
     <input id="searchBox" class="search-box" type="text" placeholder="搜尋貨品名稱...">
@@ -734,7 +734,7 @@ document.getElementById('menuEnter').addEventListener('click', () => {
   renderTabs();
   renderSubTabs();
   renderTable();
-  focusFirstTarget();
+  focusOrSkip();
 });
 function goHome() {
   countScreen.style.display = 'none';
@@ -1081,7 +1081,7 @@ function renderTabs() {
       renderSubTabs();
       renderTable();
       hideHint();
-      focusFirstTarget();
+      focusOrSkip();
     });
     tabsEl.appendChild(btn);
   });
@@ -1110,7 +1110,7 @@ function renderSubTabs() {
       renderSubTabs();
       renderTable();
       hideHint();
-      focusFirstTarget();
+      focusOrSkip();
     });
     subtabsEl.appendChild(btn);
   });
@@ -1135,6 +1135,10 @@ function focusCountCell(tr) {
   sel.removeAllRanges();
   sel.addRange(range);
   tr.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  // 手機鍵盤彈出或版面重新排列後，再確認一次仍停在畫面中央
+  setTimeout(() => {
+    if (tr.isConnected) tr.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }, 350);
 }
 
 // 目前分頁中第一個盤點數量為空白的品項（進入盤點程序、切換分頁時使用）
@@ -1156,12 +1160,82 @@ function goNextTarget(fromTr) {
   while (next && !isBlankRow(next)) next = next.nextElementSibling;
   if (next) {
     focusCountCell(next);
+  } else if (!searchTerm.trim() && jumpToNextPageWithBlank()) {
+    // 本分頁已輸入完畢 → 已自動跳到下一個有空白的子分頁／分頁
   } else {
     if (document.activeElement) document.activeElement.blur();
     closeRowHint();
     const left = Array.from(tbodyEl.querySelectorAll('tr')).filter(isBlankRow).length;
-    showStatus(left ? `已到本分頁最後，尚有 ${left} 項空白` : '本分頁已盤點完畢');
+    showStatus(left ? `已到本分頁最後，尚有 ${left} 項空白` : (searchTerm.trim() ? '搜尋結果已盤點完畢' : '全部分頁已盤點完畢'));
   }
+}
+
+// ---- 本分頁輸入完畢後，自動跳到下一個「還有空白盤點數量」的子分頁／分頁 ----
+const isBlankData = r => String(r.count_qty === null || r.count_qty === undefined ? '' : r.count_qty).trim() === '';
+
+// 依畫面順序列出所有分頁（D 類含子分頁）
+function getPageList() {
+  const pages = [];
+  Object.keys(DATA).forEach(g => {
+    if (SUBGROUP_GROUPS.includes(g)) {
+      Object.keys(getSubgroupsFor(g)).sort().forEach(sk => pages.push({ g, s: sk }));
+    } else {
+      pages.push({ g, s: null });
+    }
+  });
+  return pages;
+}
+
+function pageHasBlank(pg) {
+  const rows = DATA[pg.g] || [];
+  return rows.some(r => (pg.s === null || getSubgroupKey(r.code) === pg.s) && isBlankData(r));
+}
+
+// 該分頁所有品項的盤點數量都是預設值 0（完全不需要盤點）
+function pageAllZero(g, sk) {
+  const rows = (DATA[g] || []).filter(r => sk === null || getSubgroupKey(r.code) === sk);
+  return rows.length > 0 && rows.every(r => String(r.count_qty === null || r.count_qty === undefined ? '' : r.count_qty).trim() === '0');
+}
+
+// 進入分頁時：若該分頁盤點數量全為預設 0，自動跳到下一個需要盤點的分頁／子分頁
+function focusOrSkip() {
+  if (!searchTerm.trim() && pageAllZero(currentGroup, currentSubGroup) && jumpToNextPageWithBlank()) return;
+  focusFirstTarget();
+}
+
+// 本分頁最後一個空白填完後，停頓約 1 秒（讓多位數可以輸完）自動跳到下一分頁
+let autoAdvanceTimer = null;
+function scheduleAutoAdvance() {
+  clearTimeout(autoAdvanceTimer);
+  autoAdvanceTimer = setTimeout(() => {
+    if (searchTerm.trim()) return;
+    const stillBlank = Array.from(tbodyEl.querySelectorAll('tr')).some(isBlankRow);
+    if (stillBlank) return;
+    if (!jumpToNextPageWithBlank()) showStatus('全部分頁已盤點完畢');
+  }, 1000);
+}
+
+function jumpToNextPageWithBlank() {
+  clearTimeout(autoAdvanceTimer);
+  const pages = getPageList();
+  let idx = pages.findIndex(pg => pg.g === currentGroup && (pg.s === null || pg.s === currentSubGroup));
+  if (idx < 0) idx = 0;
+  // 先往後找，找不到再從頭找（補到中間漏掉的空白）
+  for (let step = 1; step < pages.length; step++) {
+    const pg = pages[(idx + step) % pages.length];
+    if (!pageHasBlank(pg)) continue;
+    currentGroup = pg.g;
+    currentSubGroup = pg.s;
+    renderTabs();
+    renderSubTabs();
+    renderTable();
+    hideHint();
+    focusFirstTarget();
+    const gLabel = GROUP_LABELS[pg.g] || (pg.g + ' 類');
+    showStatus('已跳到「' + gLabel + (pg.s ? '／' + getSubgroupLabel(pg.g, pg.s) : '') + '」');
+    return true;
+  }
+  return false;
 }
 
 // 目前展開盤點單位提示的那一列（同時間只會有一列展開）
@@ -1250,20 +1324,90 @@ function renderTable() {
 
     // 盤點數量欄
     const tdCount = makeCell(row.count_qty, true);
-    tdCount.addEventListener('input', () => { row.count_qty = tdCount.textContent; });
+    tdCount.addEventListener('focus', () => {
+      tdCount.dataset.wasBlank = tdCount.textContent.trim() === '' ? '1' : '0';
+      tdCount.dataset.dirty = '0';
+    });
+
+    // 只允許數字（含一個小數點）；手機顯示數字鍵盤
+    tdCount.setAttribute('inputmode', 'decimal');
     tdCount.setAttribute('enterkeyhint', 'next');
+    const cleanNumber = (txt, existing) => {
+      let out = String(txt).replace(/[^0-9.]/g, '');
+      const hasDot = String(existing || '').includes('.');
+      let seenDot = hasDot;
+      out = out.split('').filter(ch => {
+        if (ch !== '.') return true;
+        if (seenDot) return false;
+        seenDot = true; return true;
+      }).join('');
+      return out;
+    };
+    const placeCaretAtEnd = () => {
+      const range = document.createRange();
+      range.selectNodeContents(tdCount);
+      range.collapse(false);
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+    };
+
+    // 輸入完成（Enter、手機鍵盤的「下一項」、或按 ✓ 收起鍵盤）
+    const completeCell = () => {
+      tdCount.dataset.wasBlank = '0';
+      tdCount.dataset.dirty = '0';
+      clearTimeout(autoAdvanceTimer);
+      goNextTarget(tr);
+    };
+
+    tdCount.addEventListener('beforeinput', (e) => {
+      // 部分手機鍵盤（如 Android）不送 keydown，只送 beforeinput
+      if (e.inputType === 'insertParagraph' || e.inputType === 'insertLineBreak') {
+        e.preventDefault();
+        completeCell();
+        return;
+      }
+      if (e.inputType === 'insertText' && e.data != null) {
+        // 選取範圍會被取代時，以「其餘文字」判斷是否已有小數點
+        const sel = window.getSelection();
+        const selected = sel && tdCount.contains(sel.anchorNode) ? sel.toString() : '';
+        const existing = tdCount.textContent.replace(selected, '');
+        if (cleanNumber(e.data, existing) !== e.data) e.preventDefault();
+      } else if (e.inputType === 'insertFromPaste' || e.inputType === 'insertFromDrop') {
+        e.preventDefault();
+        const txt = e.dataTransfer ? e.dataTransfer.getData('text') : '';
+        const cleaned = cleanNumber(txt, tdCount.textContent);
+        if (cleaned) document.execCommand('insertText', false, cleaned);
+      }
+    });
+
+    tdCount.addEventListener('input', () => {
+      // 保險：輸入法組字等情況若混入非數字，一律濾掉
+      const raw = tdCount.textContent;
+      const cleaned = cleanNumber(raw, '');
+      if (cleaned !== raw) {
+        tdCount.textContent = cleaned;
+        placeCaretAtEnd();
+      }
+      tdCount.dataset.dirty = '1';
+      row.count_qty = tdCount.textContent;
+      // 這格原本是空白、現在填完了 → 若本分頁已無空白（其餘皆已有數值或預設 0），稍待片刻自動跳到下一分頁
+      if (tdCount.dataset.wasBlank === '1' && tdCount.textContent.trim() !== '') scheduleAutoAdvance();
+    });
+
     tdCount.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && !e.isComposing && e.keyCode !== 229) {
         e.preventDefault();
-        goNextTarget(tr);
+        completeCell();
       }
     });
-    // 部分手機鍵盤（如 Android）不送 keydown，只送 beforeinput
-    tdCount.addEventListener('beforeinput', (e) => {
-      if (e.inputType === 'insertParagraph' || e.inputType === 'insertLineBreak') {
-        e.preventDefault();
-        goNextTarget(tr);
-      }
+
+    // 按手機鍵盤上方的 ✓（完成）會直接收起鍵盤：有輸入過數值且不是點到其他輸入格 → 視同輸入完成
+    tdCount.addEventListener('blur', (e) => {
+      if (tdCount.dataset.dirty !== '1') return;
+      if (e.relatedTarget && e.relatedTarget.isContentEditable) return;   // 只是換去別的欄位
+      if (!tr.isConnected || tdCount.textContent.trim() === '') return;
+      completeCell();
     });
 
     tr.appendChild(tdName);
