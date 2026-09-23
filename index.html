@@ -10,159 +10,220 @@
 <link rel="manifest" href="manifest.json">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="備份控制台">
-<meta name="theme-color" content="#1565c0">
+<meta name="theme-color" content="#182625">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&family=ZCOOL+QingKe+HuangYou&display=swap" rel="stylesheet">
 <style>
   :root{
-    --blue:#1565c0; --blue-dark:#0d47a1; --green:#0f6e3a; --ink:#1a1a1a;
-    --muted:#6b6b6b; --bg:#f4f6f9; --card:#ffffff; --border:#e2e6ec;
+    --bg:#182625; --panel:#213533; --panel-2:#26403d; --panel-line:#33504c;
+    --gold:#c9a961; --gold-dim:#8f8055; --red:#a8483f; --teal:#5aa3a3;
+    --cream:#f0e9d8; --muted:#92a6a2;
   }
-  *{box-sizing:border-box;}
-  body{
-    margin:0; font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;
-    background:var(--bg); color:var(--ink); padding:16px; padding-bottom:100px;
+  *{ box-sizing:border-box; }
+  html,body{
+    margin:0; padding:0; background:var(--bg); color:var(--cream);
+    font-family:'Noto Sans TC',sans-serif;
   }
-  h1{font-size:1.25rem; margin:4px 0 2px;}
-  .sub{color:var(--muted); font-size:0.85rem; margin-bottom:16px; line-height:1.6;}
-  .card{
-    background:var(--card); border:1px solid var(--border); border-radius:14px;
-    padding:14px 16px; margin-bottom:12px; display:flex; align-items:center; gap:12px;
+  .wrap{ max-width:920px; margin:0 auto; padding:40px 22px 150px; }
+  @media (max-width:720px){ .wrap{ padding:20px 12px 150px; } }
+
+  /* 標題區 */
+  .masthead{
+    text-align:center; border-bottom:1px solid var(--panel-line);
+    padding-bottom:18px; margin-bottom:22px;
   }
-  .card.disabled{opacity:0.55;}
-  .card input[type=checkbox]{width:22px; height:22px; flex:0 0 auto;}
-  .card .info{flex:1; min-width:0;}
-  .card .name{font-weight:700; font-size:1rem;}
-  .card .desc{font-size:0.78rem; color:var(--muted); margin-top:2px; line-height:1.5;}
-  .card .tag{
-    font-size:0.7rem; padding:2px 8px; border-radius:10px; background:#eef2f8; color:var(--muted);
-    white-space:nowrap;
+  .masthead h1{
+    font-weight:900; font-size:52px; letter-spacing:2px; margin:0;
   }
-  .toolbar{display:flex; gap:8px; margin:14px 0;}
-  .toolbar button{
-    flex:1; padding:9px 0; border-radius:10px; border:1px solid var(--border);
-    background:#fff; color:var(--ink); font-size:0.85rem; font-weight:700; cursor:pointer;
+  @media (max-width:720px){ .masthead h1{ font-size:40px; } }
+  .masthead p{ margin:8px 0 0; color:var(--muted); font-size:13px; letter-spacing:1px; line-height:1.7; }
+
+  /* 提示 */
+  .notes{
+    border-left:3px solid var(--gold-dim); background:var(--panel);
+    padding:10px 14px; font-size:12.5px; color:var(--muted); line-height:1.8;
+    border-radius:0 6px 6px 0; margin-bottom:22px;
   }
+  .notes b{ color:var(--gold); font-weight:500; }
+
+  /* 工具列 */
+  .toolbar{ display:flex; align-items:center; justify-content:space-between; margin-bottom:4px; }
+  .count{ font-size:13px; color:var(--muted); }
+  .count b{ color:var(--gold); font-size:18px; font-weight:700; margin:0 2px; }
+  .toolbar .btns{ display:flex; gap:8px; }
+  .chip{
+    background:var(--panel-2); border:1px solid var(--panel-line); color:var(--cream);
+    padding:6px 14px; border-radius:6px; font-family:inherit; font-size:13px; cursor:pointer;
+  }
+  .chip:hover{ border-color:var(--gold); color:var(--gold); }
+
+  /* 項目列：仿萬年曆的日列 */
+  .row{
+    display:flex; align-items:center; gap:18px; padding:16px 6px;
+    border-bottom:1px solid var(--panel-line); cursor:pointer; position:relative;
+  }
+  .row:hover{ background:rgba(201,169,97,0.05); }
+  .row input{ position:absolute; opacity:0; width:1px; height:1px; }
+  .badge{
+    width:64px; height:64px; border-radius:50%; flex:0 0 auto;
+    display:flex; align-items:center; justify-content:center;
+    font-family:'ZCOOL QingKe HuangYou','Noto Serif TC',serif; font-size:38px;
+    color:var(--cream); border:1px solid var(--panel-line);
+    transition:background .2s, color .2s, border-color .2s;
+  }
+  .row input:checked + .badge{ background:var(--gold); color:var(--bg); border-color:var(--gold); }
+  .row input:focus-visible + .badge{ outline:2px solid var(--teal); outline-offset:3px; }
+  .row .info{ flex:1; min-width:0; }
+  .row .name{ font-size:18px; font-weight:700; letter-spacing:1px; }
+  .row .desc{ font-size:12.5px; color:var(--muted); margin-top:4px; line-height:1.6; }
+  .row .file{ font-size:11px; color:var(--gold-dim); margin-top:3px; word-break:break-all; }
+  .row .mark{
+    font-size:12px; color:var(--panel-line); flex:0 0 auto; transition:color .2s;
+  }
+  .row input:checked ~ .mark{ color:var(--gold); }
+
+  /* 執行結果 */
+  .result{
+    display:none; margin-top:22px; background:var(--panel); border:1px solid var(--panel-line);
+    border-radius:8px; padding:16px 18px; line-height:1.9; font-size:14px;
+  }
+  .result.show{ display:block; }
+  .result h2{ font-size:15px; margin:0 0 6px; color:var(--gold); font-weight:700; letter-spacing:1px; }
+  .result p{ margin:0 0 8px; color:var(--muted); font-size:13px; }
+  .result a{
+    display:block; padding:8px 0; color:var(--cream); font-weight:700; text-decoration:none;
+    border-bottom:1px dashed var(--panel-line);
+  }
+  .result a:last-of-type{ border-bottom:none; }
+  .result a:hover{ color:var(--gold); }
+  .result a.done{ color:var(--muted); text-decoration:line-through; font-weight:400; }
+  .result .tail{ margin:10px 0 0; }
+
+  /* 底部操作列 */
   .bottom-bar{
-    position:fixed; left:0; right:0; bottom:0; background:#fff; border-top:1px solid var(--border);
-    padding:12px 16px; display:flex; gap:10px; box-shadow:0 -4px 16px rgba(0,0,0,.06);
+    position:fixed; left:0; right:0; bottom:0; z-index:5;
+    background:rgba(24,38,37,0.96); border-top:1px solid var(--panel-line);
+    padding:12px 16px calc(12px + env(safe-area-inset-bottom,0px));
   }
+  .bottom-inner{ max-width:920px; margin:0 auto; display:flex; gap:12px; }
   .bottom-bar button{
-    flex:1; padding:13px 0; border:none; border-radius:12px; font-size:0.95rem; font-weight:700;
-    color:#fff; cursor:pointer;
+    flex:1; padding:14px 0; border-radius:8px; font-family:inherit; font-size:16px;
+    font-weight:700; letter-spacing:2px; cursor:pointer;
   }
-  #btn-backup{background:var(--blue);}
-  #btn-restore{background:var(--green);}
-  .hint-box{
-    background:#fff8e1; border:1px solid #ffe082; border-radius:10px; padding:10px 12px;
-    font-size:0.78rem; color:#7a5c00; line-height:1.6; margin-bottom:16px;
-  }
-  .status{
-    font-size:0.8rem; color:var(--muted); margin-top:6px; line-height:1.7; display:none;
-  }
-  .status.show{display:block;}
-  .status b{color:var(--blue-dark);}
+  #btn-backup{ background:var(--gold); color:var(--bg); border:1px solid var(--gold); }
+  #btn-backup:hover{ background:#d8ba74; }
+  #btn-restore{ background:transparent; color:var(--teal); border:1px solid var(--teal); }
+  #btn-restore:hover{ background:rgba(90,163,163,0.12); }
+  button:focus-visible{ outline:2px solid var(--cream); outline-offset:2px; }
 </style>
 </head>
 <body>
+<div class="wrap">
 
-  <h1>📦 備份與恢復控制台</h1>
-  <div class="sub">勾選要處理的項目，再點下方「開始備份」或「開始恢復」。每個項目會各自開啟一個分頁，執行該系統原本內建的一鍵備份／恢復功能。</div>
+  <header class="masthead">
+    <h1>備份與恢復</h1>
+    <p>勾選項目，再按下方「開始備份」或「開始恢復」</p>
+  </header>
 
-  <div class="hint-box">
-    ⚠️ 手機瀏覽器第一次執行時，可能會跳出「已封鎖快顯視窗」的提示，請點選「允許」，否則只會開啟第一個項目。<br>
-    ⚠️ 恢復時，請先自行找到對應項目的「一鍵備份」JSON檔案存放位置，開啟後在跳出的畫面中依提示選擇該檔案。
+  <div class="notes">
+    <b>備份</b>：每個項目開啟一個分頁，自動下載備份檔後關閉。<br>
+    <b>恢復</b>：先找到該項目的「一鍵備份」JSON 檔，在跳出的畫面中選擇它。<br>
+    手機瀏覽器若提示「已封鎖快顯視窗」，請選擇允許。
+  </div>
+
+  <div class="toolbar">
+    <div class="count">已選<b id="count">0</b>項</div>
+    <div class="btns">
+      <button class="chip" id="btn-select-all">全選</button>
+      <button class="chip" id="btn-select-none">全不選</button>
+    </div>
   </div>
 
   <div id="list"></div>
+  <div id="status" class="result"></div>
+</div>
 
-  <div class="toolbar">
-    <button id="btn-select-all">全選</button>
-    <button id="btn-select-none">全不選</button>
+<div class="bottom-bar">
+  <div class="bottom-inner">
+    <button id="btn-backup">開始備份</button>
+    <button id="btn-restore">開始恢復</button>
   </div>
-
-  <div id="status" class="status"></div>
-
-  <div style="height:70px"></div>
-
-  <div class="bottom-bar">
-    <button id="btn-backup">💾 開始備份</button>
-    <button id="btn-restore">📥 開始恢復</button>
-  </div>
+</div>
 
 <script>
-// ============ 項目清單 ============
 // file: 檔案名稱（需與本控制台放在同一個資料夾）
 // supported: 該檔案是否已具備 autobackup / autorestore 網址參數機制
 const APPS = [
-  { id:'xrb',  name:'蕭氏學人班', file:'index-學人logo.html',   desc:'人員名單／出席記錄／生日 一鍵備份', supported:true },
-  { id:'ztm',  name:'張氏童蒙班', file:'index-童蒙logo.html', desc:'人員名單／出席記錄／學員資料 一鍵備份', supported:true },
-  { id:'xqs',  name:'蕭氏青少班', file:'index-青少logo.html',   desc:'人員名單／出席記錄／學員資料 一鍵備份', supported:true },
-  { id:'gs',   name:'公司排程系統', file:'index-公司logo.html', desc:'當月排程／盤點庫存／叫貨一覽表 一鍵備份', supported:true },
-  { id:'sb',   name:'三班報名系統', file:'index-三班logo.html', desc:'各班人員名單 匯出／匯入', supported:true },
+  { id:'xrb',  name:'蕭氏學人班', file:'index-學人logo.html',   desc:'人員名單／出席記錄／生日', supported:true },
+  { id:'ztm',  name:'張氏童蒙班', file:'index-童蒙logo.html', desc:'人員名單／出席記錄／學員資料', supported:true },
+  { id:'xqs',  name:'蕭氏青少班', file:'index-青少logo.html',   desc:'人員名單／出席記錄／學員資料', supported:true },
+  { id:'gs',   name:'公司排程系統', file:'index-公司logo.html', desc:'當月排程／盤點庫存／叫貨一覽表', supported:true },
+  { id:'sb',   name:'三班報名系統', file:'index-三班logo.html', desc:'各班人員名單匯出／匯入', supported:true },
   { id:'th',   name:'茶會帳本', file:'index-茶會logo.html',     desc:'收支紀錄 JSON 備份／匯入', supported:true },
-  { id:'cal',  name:'萬年曆', file:'萬年曆.html',              desc:'行事曆／例行班會／生日／特殊事項 一鍵備份', supported:true },
-  { id:'wildm', name:'戶外活動餐點彙整', file:'index-戶外-彙整.html', desc:'各區戶外活動餐點提供資料 一鍵備份', supported:true },
-  { id:'inv', name:'庫存盤點表', file:'index-庫存盤點logo.html', desc:'各分類品項清單／盤點數量 一鍵備份', supported:true },
+  { id:'cal',  name:'萬年曆', file:'萬年曆.html',              desc:'行事曆／例行班會／生日／特殊事項', supported:true },
+  { id:'wildm', name:'戶外活動餐點彙整', file:'index-戶外-彙整.html', desc:'各區戶外活動餐點提供資料', supported:true },
+  { id:'inv', name:'庫存盤點表', file:'index-庫存盤點logo.html', desc:'各分類品項清單／盤點數量', supported:true },
 ];
 
 const listEl = document.getElementById('list');
 APPS.forEach(app => {
-  const card = document.createElement('label');
-  card.className = 'card' + (app.supported ? '' : ' disabled');
-  card.innerHTML = `
+  const row = document.createElement('label');
+  row.className = 'row';
+  row.innerHTML = `
     <input type="checkbox" data-id="${app.id}" ${app.supported ? 'checked' : 'disabled'}>
+    <div class="badge"></div>
     <div class="info">
       <div class="name">${app.name}</div>
       <div class="desc">${app.desc}</div>
     </div>
-    <div class="tag">${app.supported ? '支援' : '不支援'}</div>
+    <div class="mark">${app.supported ? '已選' : '不支援'}</div>
   `;
-  listEl.appendChild(card);
+  listEl.appendChild(row);
 });
+
+// 徽章文字：取名稱中最具辨識度的字（蕭氏學人班→學、張氏童蒙班→童…）
+const BADGE = { xrb:'學', ztm:'童', xqs:'青', gs:'公', sb:'三', th:'茶', cal:'曆', wildm:'戶', inv:'庫' };
+document.querySelectorAll('.badge').forEach((b, i) => { b.textContent = BADGE[APPS[i].id] || APPS[i].name.charAt(0); });
+
+const boxes = () => [...document.querySelectorAll('input[type=checkbox]:not(:disabled)')];
+
+function refresh(){
+  document.getElementById('count').textContent = boxes().filter(c => c.checked).length;
+  document.querySelectorAll('.row').forEach(r => {
+    const c = r.querySelector('input');
+    const m = r.querySelector('.mark');
+    if (!c.disabled) m.textContent = c.checked ? '已選' : '未選';
+  });
+}
+listEl.addEventListener('change', refresh);
+refresh();
 
 function getSelected(){
   return APPS.filter(a => a.supported && document.querySelector(`input[data-id="${a.id}"]`).checked);
 }
 
-document.getElementById('btn-select-all').onclick = () => {
-  document.querySelectorAll('input[type=checkbox]:not(:disabled)').forEach(c => c.checked = true);
-};
-document.getElementById('btn-select-none').onclick = () => {
-  document.querySelectorAll('input[type=checkbox]:not(:disabled)').forEach(c => c.checked = false);
-};
-
-function setStatus(html){
-  const s = document.getElementById('status');
-  s.innerHTML = html;
-  s.classList.add('show');
-}
+document.getElementById('btn-select-all').onclick = () => { boxes().forEach(c => c.checked = true); refresh(); };
+document.getElementById('btn-select-none').onclick = () => { boxes().forEach(c => c.checked = false); refresh(); };
 
 function runBatch(action){
   const selected = getSelected();
-  if (selected.length === 0) {
-    alert('請至少勾選一個項目');
-    return;
-  }
+  if (selected.length === 0) { alert('請至少勾選一個項目'); return; }
   const label = action === 'autobackup' ? '備份' : '恢復';
 
   // 不使用 window.open 批次開啟（手機瀏覽器通常會封鎖）。
-  // 改為列出可點擊連結，讓使用者逐一點擊，每次點擊都是使用者的直接操作，
-  // 瀏覽器不會視為快顯視窗而封鎖。
-  const links = selected.map((app, i) => {
-    const linkId = `link-${action}-${app.id}`;
-    return `<div style="margin:4px 0;">
-      ${i + 1}. <a id="${linkId}" href="${app.file}?${action}=1" target="_blank"
-        style="color:#1565c0; font-weight:700;"
-        onclick="document.getElementById('${linkId}').style.color='#888';">${app.name}</a>
-    </div>`;
-  }).join('');
+  // 改為列出可點擊連結，每次點擊都是使用者的直接操作，不會被視為快顯視窗。
+  const links = selected.map((app, i) =>
+    `<a href="${app.file}?${action}=1" target="_blank" onclick="this.classList.add('done')">${i + 1}. ${app.name}</a>`
+  ).join('');
 
-  let msg = `請依序點擊下方 <b>${selected.length}</b> 個連結，逐一開啟進行${label}（點過的連結會加上刪除線）：<br>${links}`;
-  if (action === 'autobackup') {
-    msg += `每個分頁會自動下載備份檔並在完成後自動關閉。`;
-  } else {
-    msg += `請在每個分頁跳出的檔案選擇畫面中，選取該項目對應的備份 JSON 檔。`;
-  }
-  setStatus(msg);
+  const tail = action === 'autobackup'
+    ? '每個分頁會自動下載備份檔，完成後自動關閉。'
+    : '請在每個分頁跳出的檔案選擇畫面中，選取該項目對應的備份 JSON 檔。';
+
+  const s = document.getElementById('status');
+  s.innerHTML = `<h2>${label}：共 ${selected.length} 項</h2><p>依序點擊下方連結，點過的項目會加上刪除線。</p>${links}<p class="tail">${tail}</p>`;
+  s.classList.add('show');
+  s.scrollIntoView({ behavior:'smooth', block:'center' });
 }
 
 document.getElementById('btn-backup').onclick = () => runBatch('autobackup');
