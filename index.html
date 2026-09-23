@@ -96,7 +96,7 @@
   }
   .result a:last-of-type{ border-bottom:none; }
   .result a:hover{ color:var(--gold); }
-  .result a.done{ color:var(--muted); text-decoration:line-through; font-weight:400; }
+  .result a.done{ color:var(--muted); opacity:.55; font-weight:400; }
   .result .tail{ margin:10px 0 0; }
 
   /* 底部操作列 */
@@ -221,7 +221,7 @@ function runBatch(action){
     : '請在每個分頁跳出的檔案選擇畫面中，選取該項目對應的備份 JSON 檔。';
 
   const s = document.getElementById('status');
-  s.innerHTML = `<h2>${label}：共 ${selected.length} 項</h2><p>依序點擊下方連結，點過的項目會加上刪除線。</p>${links}<p class="tail">${tail}</p>`;
+  s.innerHTML = `<h2>${label}：共 ${selected.length} 項</h2><p>依序點擊下方連結，點過的項目顏色會變淡。</p>${links}<p class="tail">${tail}</p>`;
   s.classList.add('show');
   s.scrollIntoView({ behavior:'smooth', block:'center' });
 }
