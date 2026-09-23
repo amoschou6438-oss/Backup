@@ -198,27 +198,76 @@
     border-color: var(--accent);
     color: var(--accent);
   }
-  .float-home-btn {
+  /* 右下角浮動選單：收合時只顯示 📂；按下變 📁，🔝／🏠 由下往上滑出。
+     可按住 📂 拖曳到任何位置（位置會記住）；靠上時往下展開；靠左時標籤放右側 */
+  .float-menu {
+    --fm-right: 18px;
+    --fm-bottom: 18px;
+    --fm-size: 56px;
+    --fm-gap: 68px;
     position: fixed;
-    right: 18px;
-    bottom: 18px;
-    z-index: 50;
-    width: 56px;
-    height: 56px;
-    min-height: 56px;
+    right: var(--fm-right);
+    bottom: var(--fm-bottom);
+    width: var(--fm-size);
+    height: var(--fm-size);
+    z-index: 51;
+  }
+  .float-menu-btn,
+  .float-home-btn,
+  .float-top-btn {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    width: var(--fm-size);
+    height: var(--fm-size);
+    min-height: var(--fm-size);
     border-radius: 50%;
     padding: 0;
     display: flex;
     align-items: center;
     justify-content: center;
-    background: #1c2340;
+    background: #ffffff;
     border: 3px solid #d4af5a;
-    color: #ffffff;
+    color: #1c2340;
     font-size: 1.6rem;
     line-height: 1;
     box-shadow: 0 4px 14px rgba(0,0,0,0.28);
   }
-  .float-home-btn:hover { background: #232b4d; }
+  .float-menu-btn { z-index: 2; touch-action: none; user-select: none; -webkit-user-select: none; cursor: grab; transition: transform .15s ease; }
+  .float-home-btn,
+  .float-top-btn {
+    z-index: 1;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transform: scale(.5);
+    transition: transform .25s ease, opacity .2s ease, visibility 0s linear .25s;
+  }
+  .float-menu.open .float-home-btn,
+  .float-menu.open .float-top-btn {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transition: transform .25s ease, opacity .2s ease, visibility 0s;
+  }
+  .float-menu.open .float-home-btn { transform: translateY(calc(var(--fm-gap) * -1)); }
+  .float-menu.open .float-top-btn  { transform: translateY(calc(var(--fm-gap) * -2)); }
+  .float-menu.fm-down.open .float-home-btn { transform: translateY(var(--fm-gap)); }
+  .float-menu.fm-down.open .float-top-btn  { transform: translateY(calc(var(--fm-gap) * 2)); }
+  .float-menu-btn:hover,
+  .float-home-btn:hover,
+  .float-top-btn:hover { background: #f3f3f3; }
+  .float-menu-btn:active { transform: scale(0.94); }
+  .float-menu.open .float-home-btn:active,
+  .float-menu.open .float-top-btn:active { filter: brightness(0.92); }
+  .float-menu.fm-dragging .float-menu-btn { cursor: grabbing; transition: none; transform: scale(1.1); box-shadow: 0 10px 26px rgba(0,0,0,0.35); }
+  .fm-label {
+    position: absolute; top: 50%; right: calc(100% + 10px); transform: translateY(-50%);
+    background: rgba(28,35,64,0.88); color: #fff; font-size: 0.8rem; font-weight: 700; line-height: 1;
+    padding: 6px 11px; border-radius: 999px; white-space: nowrap; pointer-events: none;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+  }
+  .float-menu.fm-label-right .fm-label { right: auto; left: calc(100% + 10px); }
   .zero-toggle-bar { margin: 0 0 10px 0; display: flex; justify-content: center; }
   .zero-pill {
     display: inline-flex;
@@ -280,31 +329,9 @@
     touch-action: manipulation;
   }
   .next-btn:active { transform: scale(0.95); }
-  .float-top-btn {
-    position: fixed;
-    right: 18px;
-    bottom: 86px;
-    z-index: 50;
-    width: 56px;
-    height: 56px;
-    min-height: 56px;
-    border-radius: 50%;
-    padding: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: #1c2340;
-    border: 3px solid #d4af5a;
-    color: #ffffff;
-    box-shadow: 0 4px 14px rgba(0,0,0,0.28);
-  }
-  .float-top-btn svg { width: 26px; height: 26px; }
-  .float-top-btn:hover { background: #232b4d; }
-  .float-top-btn:active { transform: scale(0.94); }
-  .float-home-btn:active { transform: scale(0.94); }
   @media (max-width: 640px) {
-    .float-home-btn { right: 14px; bottom: 14px; width: 52px; height: 52px; min-height: 52px; font-size: 1.45rem; }
-    .float-top-btn { right: 14px; bottom: 76px; width: 52px; height: 52px; min-height: 52px; }
+    .float-menu { --fm-right: 14px; --fm-bottom: 14px; --fm-size: 52px; --fm-gap: 62px; }
+    .float-menu-btn, .float-home-btn, .float-top-btn { font-size: 1.45rem; }
   }
   .card {
     background: var(--card-bg);
@@ -724,8 +751,11 @@
   <div class="tabs" id="tabs"></div>
   <div class="subtabs" id="subtabs"></div>
 
-  <button id="floatHomeBtn" class="float-home-btn" title="回到主畫面" aria-label="回到主畫面">🏠</button>
-  <button id="floatTopBtn" class="float-top-btn" title="回到最上面" aria-label="回到最上面"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4h14"/><path d="M12 20V9"/><path d="M6 14l6-6 6 6"/></svg></button>
+  <div id="floatMenu" class="float-menu">
+    <button id="floatHomeBtn" class="float-home-btn" type="button" title="回到主畫面" aria-label="回到主畫面">🏠<span class="fm-label">主畫面</span></button>
+    <button id="floatTopBtn" class="float-top-btn" type="button" title="回到最上面" aria-label="回到最上面">🔝<span class="fm-label">到頂端</span></button>
+    <button id="floatMenuBtn" class="float-menu-btn" type="button" title="展開選單（可按住拖曳移動）" aria-label="展開選單" aria-expanded="false">📂</button>
+  </div>
   <div id="nextBar" class="next-bar"><button id="nextBtn" class="next-btn" type="button">下一項 ›</button></div>
 
   <div id="zeroToggleBar" class="zero-toggle-bar" style="display:none;">
@@ -834,7 +864,112 @@ document.getElementById('menuEnter').addEventListener('click', () => {
   renderTable();
   focusOrSkip();
 });
+// ---- 右下角浮動選單：📂 展開（變 📁）／📁 收起 ----
+const floatMenu = document.getElementById('floatMenu');
+const floatMenuBtn = document.getElementById('floatMenuBtn');
+function setFloatMenu(open) {
+  floatMenu.classList.toggle('open', open);
+  floatMenuBtn.textContent = open ? '📁' : '📂';
+  floatMenuBtn.title = open ? '收起選單' : '展開選單（可按住拖曳移動）';
+  floatMenuBtn.setAttribute('aria-label', open ? '收起選單' : '展開選單');
+  floatMenuBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+}
+floatMenuBtn.addEventListener('click', () => setFloatMenu(!floatMenu.classList.contains('open')));
+
+// ── 選單可自由拖曳：按住 📂 拖曳即可移到畫面任何位置，放開後會記住位置 ──
+// 靠近上方時往下展開；靠近左邊時標籤改放右側
+function initDraggableMenu(cfg) {
+  const menu = cfg.menu, main = cfg.main;
+  if (!menu || !main) return;
+  const M = 8, DRAG_PX = 6;
+  const vw = () => document.documentElement.clientWidth || window.innerWidth;
+  const vh = () => document.documentElement.clientHeight || window.innerHeight;
+  const size = () => menu.offsetWidth || cfg.size;
+  const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), Math.max(lo, hi));
+  const limits = () => ({ minX: M, minY: M, maxX: vw() - size() - M, maxY: vh() - size() - M });
+  let saved = null, drag = null, justDragged = false;
+  try { saved = JSON.parse(localStorage.getItem(cfg.key) || 'null'); } catch (e) {}
+  if (saved && !(isFinite(saved.x) && isFinite(saved.y))) saved = null;
+
+  function place(left, top) {
+    const L = limits();
+    menu.style.right = 'auto'; menu.style.bottom = 'auto';
+    menu.style.left = clamp(left, L.minX, L.maxX) + 'px';
+    menu.style.top  = clamp(top,  L.minY, L.maxY) + 'px';
+  }
+  function applySaved() {
+    if (!saved) return;
+    const L = limits();
+    place(L.minX + clamp(saved.x, 0, 1) * (L.maxX - L.minX),
+          L.minY + clamp(saved.y, 0, 1) * (L.maxY - L.minY));
+  }
+  function save() {
+    const r = menu.getBoundingClientRect(), L = limits();
+    saved = {
+      x: L.maxX > L.minX ? (r.left - L.minX) / (L.maxX - L.minX) : 0,
+      y: L.maxY > L.minY ? (r.top  - L.minY) / (L.maxY - L.minY) : 0
+    };
+    try { localStorage.setItem(cfg.key, JSON.stringify(saved)); } catch (e) {}
+  }
+  // 依目前位置決定：往上／往下展開、標籤放左／放右
+  function updateLayout() {
+    const r = menu.getBoundingClientRect();
+    if (!r.width) return;
+    const need = cfg.items * (r.width + 10) + M;
+    const above = r.top, below = vh() - r.bottom;
+    menu.classList.toggle('fm-down', above < need && below > above);
+    const leftRoom = r.left, rightRoom = vw() - r.right;
+    menu.classList.toggle('fm-label-right', leftRoom < 112 && rightRoom > leftRoom);
+  }
+
+  main.addEventListener('pointerdown', e => {
+    if (e.button !== undefined && e.button !== 0) return;
+    const r = menu.getBoundingClientRect();
+    drag = { id: e.pointerId, sx: e.clientX, sy: e.clientY, ox: r.left, oy: r.top, moved: false };
+    try { main.setPointerCapture(e.pointerId); } catch (_) {}
+  });
+  main.addEventListener('pointermove', e => {
+    if (!drag || e.pointerId !== drag.id) return;
+    const dx = e.clientX - drag.sx, dy = e.clientY - drag.sy;
+    if (!drag.moved) {
+      if (Math.hypot(dx, dy) < DRAG_PX) return;
+      drag.moved = true;
+      menu.classList.add('fm-dragging');
+      cfg.close();
+    }
+    place(drag.ox + dx, drag.oy + dy);
+    e.preventDefault();
+  });
+  function endDrag(e) {
+    if (!drag || e.pointerId !== drag.id) return;
+    const moved = drag.moved;
+    drag = null;
+    menu.classList.remove('fm-dragging');
+    if (moved) {
+      save(); updateLayout();
+      justDragged = true;
+      setTimeout(() => { justDragged = false; }, 80);
+    }
+  }
+  main.addEventListener('pointerup', endDrag);
+  main.addEventListener('pointercancel', endDrag);
+  // 拖曳結束時不要當成「點一下」；正常點擊則在展開前先算好方向
+  menu.addEventListener('click', e => {
+    if (justDragged) { e.stopPropagation(); e.preventDefault(); return; }
+    if (main.contains(e.target)) updateLayout();
+  }, true);
+  window.addEventListener('resize', () => { applySaved(); updateLayout(); });
+  applySaved();
+  updateLayout();
+}
+function __startDraggableMenu(cfg) {
+  const go = () => initDraggableMenu(cfg);
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', go); else go();
+}
+__startDraggableMenu({ menu: document.getElementById('floatMenu'), main: document.getElementById('floatMenuBtn'), key: 'fabPos_庫存盤點', close: () => setFloatMenu(false), size: 56, items: 2 });
+
 function goHome() {
+  setFloatMenu(false);
   nextBar.style.display = 'none';
   nextBarShown = false;
   countScreen.style.display = 'none';
@@ -1821,7 +1956,7 @@ function renderTable() {
     // 按手機鍵盤上方的 ✓（完成）會直接收起鍵盤：有輸入過數值且不是點到其他輸入格 → 視同輸入完成
     tdCount.addEventListener('blur', (e) => {
       if (tdCount.dataset.dirty !== '1') return;
-      if (e.relatedTarget && (e.relatedTarget.isContentEditable || e.relatedTarget.closest('.float-top-btn, .zero-toggle-btn'))) return;   // 只是換去別的欄位／點回到最上面
+      if (e.relatedTarget && (e.relatedTarget.isContentEditable || e.relatedTarget.closest('.float-menu-btn, .float-top-btn, .zero-toggle-btn'))) return;   // 只是換去別的欄位／點回到最上面
       if (!tr.isConnected || tdCount.textContent.trim() === '') return;
       completeCell();
       reviveKeyboard();   // 按 ✓ 收起鍵盤後，讓下一格的游標與鍵盤直接出現
