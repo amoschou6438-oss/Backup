@@ -341,7 +341,8 @@ function inject(html, block){
 const CFG_KEY = 'bk_github_cfg_v1';
 let cfg = {}; try { cfg = JSON.parse(localStorage.getItem(CFG_KEY)) || {}; } catch (e) {}
 cfg.token = cfg.token || ''; cfg.apps = cfg.apps || {};
-if (!cfg.apps.xqs) cfg.apps.xqs = { repo:'amoschou6438-oss/Young-class', path:'index.html' };
+const DEF_REPOS = { inv:'Inventory-Check', xrb:'Study-man', cal:'Calendar-', ztm:'Child-class', th:'Teapay', xqs:'Young-class', gs:'COMPANYS', sb:'Threeclass' };
+Object.keys(DEF_REPOS).forEach(id => { if (!cfg.apps[id] || !cfg.apps[id].repo) cfg.apps[id] = { repo:'amoschou6438-oss/' + DEF_REPOS[id], path:'index.html' }; });
 const saveCfg = () => { try { localStorage.setItem(CFG_KEY, JSON.stringify(cfg)); } catch (e) {} };
 const WAPPS = WRITERS.map(w => w.appId).filter((v, i, a) => a.indexOf(v) === i).map(id => APPS.find(a => a.id === id));
 const ready = id => cfg.apps[id] && /^[^\/\s]+\/[^\/\s]+$/.test(cfg.apps[id].repo || '') && (cfg.apps[id].path || '').trim();
