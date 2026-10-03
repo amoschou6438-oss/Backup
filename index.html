@@ -246,12 +246,84 @@ function runBatch(action){
 document.getElementById('btn-backup').onclick = () => runBatch('autobackup');
 document.getElementById('btn-restore').onclick = () => runBatch('autorestore');
 // ===== 寫入資料：把備份 JSON 直接寫進各頁面的瀏覽器儲存空間 =====
-// 新增項目時在此加一筆：key 為備份檔內的 app 標記
-const WRITERS = {
-  'inventory-count-backup': { appId:'inv', stateKey:'inventory_count_state_v1', backupKey:'inventory_count_backup_v1' },
-};
+// 每個項目：detect 判斷備份檔屬於誰、count 顯示筆數、apply 寫入 localStorage（key 與各頁面自己的一致）
+const LS = (k, v) => localStorage.setItem(k, typeof v === 'string' ? v : JSON.stringify(v));
+const LSget = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) || d; } catch (e) { return d; } };
+const isObj = x => x && typeof x === 'object' && !Array.isArray(x);
+const keysN = o => isObj(o) ? Object.keys(o).length : 0;
+
+// 學人／青少／童蒙三班結構相同，只有 key 與生日欄位不同
+function classWriter(appId, exportType, dataKey, recKey, bdFields) {
+  return {
+    appId,
+    detect: p => p.exportType === exportType,
+    count: p => `${p.members.length} 筆人員、${keysN(p.monthlyRecord)} 位學員出席記錄`,
+    apply: p => {
+      if (!Array.isArray(p.members) || !p.members.length) throw new Error('備份檔內找不到人員名單');
+      const members = p.members.map(m => Object.assign({}, m, { familyOrder: m.familyOrder != null ? m.familyOrder : 1 }));
+      if (appId === 'xrb') members.forEach((m, i) => { m.no = i + 1; });
+      const d = { members, staffNames: p.staffNames || '', noBentoNames: p.noBentoNames || '' };
+      bdFields.forEach(f => { d[f] = p[f] || {}; });
+      LS(dataKey, d);
+      if (isObj(p.monthlyRecord)) LS(recKey, p.monthlyRecord);
+      return [dataKey, recKey];
+    }
+  };
+}
+
+const WRITERS = [
+  { appId:'inv', detect: p => p.app === 'inventory-count-backup',
+    count: p => Object.values(p.data || {}).reduce((s, v) => s + (Array.isArray(v) ? v.length : 0), 0) + ' 筆品項',
+    apply: p => { if (!isObj(p.data)) throw new Error('備份檔內沒有 data 欄位');
+      LS('inventory_count_state_v1', { v:1, time:new Date().toISOString(), data:p.data });
+      LS('inventory_count_backup_v1', { time:p.time, data:p.data }); return ['inventory_count_state_v1']; } },
+
+  classWriter('xrb', 'xrb_full_backup', 'xrb_data_v2',  'xrb_monthly_record_v1', ['memberBirthdayExtra']),
+  classWriter('xqs', 'qsb_full_backup', 'qsb_data',     'qsb_monthly_record_v1', ['studentBirthdayExtra', 'parentBirthdayExtra']),
+  classWriter('ztm', 'tmb_full_backup', 'tmb_data_main','tmb_monthly_record_v1', ['studentBirthdayExtra', 'parentBirthdayExtra']),
+
+  { appId:'sb', detect: p => p.type === 'sanban_roster_export',
+    count: p => keysN(p.data) + ' 組名單資料',
+    apply: p => { if (!isObj(p.data)) throw new Error('備份檔內沒有 data 欄位'); LS('sanban_roster_state_v1', p.data); return ['sanban_roster_state_v1']; } },
+
+  // 茶會帳本的備份檔沒有標記，以內容（members + records，且不是班級備份）判斷
+  { appId:'th', detect: p => Array.isArray(p.members) && Array.isArray(p.records) && !p.exportType,
+    count: p => `${p.members.length} 位成員、${p.records.length} 筆收支`,
+    apply: p => { LS('tea-ledger-data', p); return ['tea-ledger-data']; } },
+
+  { appId:'cal', detect: p => p.type === 'calendar-backup',
+    count: p => `行事曆 ${keysN(p.events)} 天、例行 ${(p.routines || []).length}、生日 ${(p.birthdays || []).length}、特殊 ${(p.specials || []).length}`,
+    apply: p => {
+      LS('calendar-events-v1', isObj(p.events) ? p.events : {});
+      LS('calendar-routines-v1', Array.isArray(p.routines) ? p.routines : []);
+      LS('calendar-birthdays-v1', Array.isArray(p.birthdays) ? p.birthdays : []);
+      LS('calendar-specials-v1', Array.isArray(p.specials) ? p.specials : []);
+      return ['calendar-events-v1', 'calendar-routines-v1', 'calendar-birthdays-v1', 'calendar-specials-v1'];
+    } },
+
+  // 公司排程系統：備份只含當月＋下月，因此以「按日期合併」方式寫入（與該頁面自己的還原行為一致）
+  { appId:'gs', detect: p => p.type === 'der-life-full-monthly-backup',
+    count: p => `排程 ${keysN(p.schedule)} 天、盤點欄位 ${keysN(p.inventory)} 個、叫貨 ${keysN(p.orderSched)} 天（${p.year}年${p.month}月起）`,
+    apply: p => {
+      const sched = LSget('schedule_v2', {});
+      try { LS('schedule_v2_backup_before_json_import', sched); } catch (e) {}
+      Object.keys(p.schedule || {}).forEach(k => { sched[k] = p.schedule[k]; });
+      LS('schedule_v2', sched);
+      const os = LSget('order_sched_v1', {}); Object.keys(p.orderSched || {}).forEach(k => { os[k] = p.orderSched[k]; }); LS('order_sched_v1', os);
+      const oa = LSget('order_arrival_v1', {}); Object.keys(p.orderArrival || {}).forEach(k => { oa[k] = p.orderArrival[k]; }); LS('order_arrival_v1', oa);
+      Object.keys(p.inventory || {}).forEach(id => localStorage.setItem('inp_' + id, p.inventory[id]));
+      return ['schedule_v2', 'order_sched_v1', 'order_arrival_v1'];
+    } },
+];
+
+// 已知格式但無法用此方式寫入的備份
+const UNSUPPORTED = [
+  { detect: p => p.type === 'meal-entries-backup', why:'戶外活動餐點彙整的資料不是存在瀏覽器裡，無法由本頁寫入' },
+];
+
 let wItems = [];
-const fmtT = iso => { const d = new Date(iso); if (isNaN(d)) return '未知時間'; const p = n => String(n).padStart(2,'0'); return `${d.getFullYear()}/${p(d.getMonth()+1)}/${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`; };
+const fmtT = iso => { const d = new Date(iso); if (isNaN(d)) return ''; const p = n => String(n).padStart(2,'0'); return `${d.getFullYear()}/${p(d.getMonth()+1)}/${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`; };
+const payloadTime = p => Date.parse(p.time || p.exportDate || p.exportedAt) || 0;
 
 document.getElementById('btn-write').onclick = () => document.getElementById('w-file').click();
 document.getElementById('w-file').onchange = async e => {
@@ -261,14 +333,16 @@ document.getElementById('w-file').onchange = async e => {
   for (const f of files) {
     try {
       const p = JSON.parse(await f.text());
-      const w = WRITERS[p && p.app];
-      if (!w) throw new Error('無法辨識這是哪一個項目的備份（目前僅支援庫存盤點表）');
-      if (!p.data || typeof p.data !== 'object') throw new Error('備份檔內沒有 data 欄位');
-      const t = Date.parse(p.time) || 0;
-      if (!best[p.app] || t > best[p.app].t) best[p.app] = { w, app:APPS.find(a => a.id === w.appId), fileName:f.name, payload:p, t };
+      if (!isObj(p)) throw new Error('不是有效的備份檔');
+      const un = UNSUPPORTED.find(u => u.detect(p));
+      if (un) throw new Error(un.why);
+      const w = WRITERS.find(w => w.detect(p));
+      if (!w) throw new Error('無法辨識這是哪一個項目的備份');
+      const t = payloadTime(p);
+      if (!best[w.appId] || t > best[w.appId].t) best[w.appId] = { w, app:APPS.find(a => a.id === w.appId), fileName:f.name, payload:p, t };
     } catch (err) { bad.push({ fileName:f.name, error:err.message }); }
   }
-  wItems = Object.values(best).map(b => ({ ...b, count:Object.values(b.payload.data).reduce((s,v) => s + (Array.isArray(v) ? v.length : 0), 0) })).concat(bad);
+  wItems = Object.values(best).map(b => { let c = ''; try { c = b.w.count(b.payload); } catch (e) {} return { ...b, count:c }; }).concat(bad);
   renderWrite();
 };
 
@@ -280,9 +354,9 @@ function renderWrite(){
   wItems.forEach((it, i) => {
     html += it.error
       ? `<div class="wrow" style="cursor:default"><div><div class="wn">${it.fileName}</div><div class="ws err" id="ws-${i}">${it.error}</div></div></div>`
-      : `<label class="wrow"><input type="checkbox" data-wi="${i}" checked><div><div class="wn">${it.app.name}</div><div class="ws ok" id="ws-${i}">${it.fileName}<br>備份時間 ${fmtT(it.payload.time)}，共 ${it.count} 筆</div></div></label>`;
+      : `<label class="wrow"><input type="checkbox" data-wi="${i}" checked><div><div class="wn">${it.app.name}</div><div class="ws ok" id="ws-${i}">${it.fileName}<br>${fmtT(it.t) ? '備份時間 ' + fmtT(it.t) + '，' : ''}${it.count}</div></div></label>`;
   });
-  if (ok) html += `<button class="wgo" id="w-go">確認寫入</button><p class="tail">會取代該頁面目前的資料。請用與平常開啟那些頁面相同的方式開啟本頁。</p>`;
+  if (ok) html += `<button class="wgo" id="w-go">確認寫入</button><p class="tail">會取代該頁面目前的資料（公司排程系統則按日期合併）。請用與平常開啟那些頁面相同的方式開啟本頁；若該頁面正開在其他分頁，請先關閉再寫入。</p>`;
   s.innerHTML = html; s.classList.add('show');
   s.scrollIntoView({ behavior:'smooth', block:'center' });
   const go = document.getElementById('w-go');
@@ -292,17 +366,14 @@ function renderWrite(){
 function doWrite(){
   const sel = [...document.querySelectorAll('input[data-wi]:checked')].map(c => +c.dataset.wi);
   if (!sel.length) { alert('請至少勾選一個項目'); return; }
-  if (!confirm(`即將寫入 ${sel.length} 個項目，會取代該頁面目前的資料，確定嗎？`)) return;
+  if (!confirm(`即將寫入 ${sel.length} 個項目，確定嗎？`)) return;
   sel.forEach(i => {
     const it = wItems[i], st = document.getElementById('ws-' + i);
     try {
-      const data = it.payload.data;
-      localStorage.setItem(it.w.stateKey, JSON.stringify({ v:1, time:new Date().toISOString(), data }));
-      localStorage.setItem(it.w.backupKey, JSON.stringify({ time:it.payload.time, data }));
-      const back = JSON.parse(localStorage.getItem(it.w.stateKey));
-      if (JSON.stringify(back.data) !== JSON.stringify(data)) throw new Error('寫入後驗證不符');
+      const keys = it.w.apply(it.payload);
+      keys.forEach(k => { if (localStorage.getItem(k) === null) throw new Error('寫入後讀不到 ' + k); });
       st.className = 'ws done';
-      st.innerHTML = `✓ 已寫入 ${it.count} 筆 <a class="wopen" href="${it.app.file}">開啟</a>`;
+      st.innerHTML = `✓ 已寫入（${it.count}） <a class="wopen" href="${it.app.file}">開啟</a>`;
     } catch (err) { st.className = 'ws err'; st.textContent = '✗ 寫入失敗：' + err.message; }
   });
 }
