@@ -114,7 +114,21 @@
   #btn-backup:hover{ background:#d8ba74; }
   #btn-restore{ background:transparent; color:var(--teal); border:1px solid var(--teal); }
   #btn-restore:hover{ background:rgba(90,163,163,0.12); }
+  #btn-write{ background:transparent; color:var(--gold); border:1px solid var(--gold); }
+  #btn-write:hover{ background:rgba(201,169,97,0.12); }
+  .bottom-bar button{ font-size:15px; letter-spacing:1px; }
   button:focus-visible{ outline:2px solid var(--cream); outline-offset:2px; }
+
+  /* 寫入面板 */
+  .wrow{ display:flex; align-items:center; gap:12px; padding:10px 0; border-bottom:1px dashed var(--panel-line); cursor:pointer; }
+  .wrow:last-of-type{ border-bottom:none; }
+  .wrow input{ width:20px; height:20px; accent-color:var(--gold); flex:0 0 auto; }
+  .wrow .wn{ font-weight:700; font-size:15px; }
+  .wrow .ws{ font-size:12px; color:var(--muted); line-height:1.6; word-break:break-all; }
+  .wrow .ws.ok{ color:var(--teal); } .wrow .ws.err{ color:#d0665b; } .wrow .ws.done{ color:var(--gold); }
+  .wopen{ margin-left:auto; color:var(--gold); font-size:13px; border:1px solid var(--gold-dim); padding:5px 10px; border-radius:6px; text-decoration:none; white-space:nowrap; }
+  .wgo{ margin-top:12px; width:100%; padding:12px 0; border-radius:8px; border:1px solid var(--gold); background:var(--gold); color:var(--bg); font-family:inherit; font-size:15px; font-weight:700; letter-spacing:2px; cursor:pointer; }
+  .wgo:disabled{ opacity:.4; }
 </style>
 </head>
 <body>
@@ -122,12 +136,13 @@
 
   <header class="masthead">
     <h1>備份與恢復</h1>
-    <p>勾選項目，再按下方「開始備份」或「開始恢復」</p>
+    <p>勾選項目後按「開始備份」或「開始恢復」；要把備份檔寫入頁面，按「寫入資料」</p>
   </header>
 
   <div class="notes">
     <b>備份</b>：每個項目開啟一個分頁，自動下載備份檔後關閉。<br>
     <b>恢復</b>：先找到該項目的「一鍵備份」JSON 檔，在跳出的畫面中選擇它。<br>
+    <b>寫入</b>：按「寫入資料」，一次選多個備份 JSON，按「確認寫入」即直接寫進對應頁面（需與各頁面在同一網站，並用相同方式開啟）。<br>
     手機瀏覽器若提示「已封鎖快顯視窗」，請選擇允許。
   </div>
 
@@ -147,6 +162,8 @@
   <div class="bottom-inner">
     <button id="btn-backup">開始備份</button>
     <button id="btn-restore">開始恢復</button>
+    <button id="btn-write">寫入資料</button>
+    <input type="file" id="w-file" accept=".json,application/json" multiple hidden>
   </div>
 </div>
 
@@ -228,6 +245,67 @@ function runBatch(action){
 
 document.getElementById('btn-backup').onclick = () => runBatch('autobackup');
 document.getElementById('btn-restore').onclick = () => runBatch('autorestore');
+// ===== 寫入資料：把備份 JSON 直接寫進各頁面的瀏覽器儲存空間 =====
+// 新增項目時在此加一筆：key 為備份檔內的 app 標記
+const WRITERS = {
+  'inventory-count-backup': { appId:'inv', stateKey:'inventory_count_state_v1', backupKey:'inventory_count_backup_v1' },
+};
+let wItems = [];
+const fmtT = iso => { const d = new Date(iso); if (isNaN(d)) return '未知時間'; const p = n => String(n).padStart(2,'0'); return `${d.getFullYear()}/${p(d.getMonth()+1)}/${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`; };
+
+document.getElementById('btn-write').onclick = () => document.getElementById('w-file').click();
+document.getElementById('w-file').onchange = async e => {
+  const files = [...e.target.files]; e.target.value = '';
+  if (!files.length) return;
+  const best = {}, bad = [];
+  for (const f of files) {
+    try {
+      const p = JSON.parse(await f.text());
+      const w = WRITERS[p && p.app];
+      if (!w) throw new Error('無法辨識這是哪一個項目的備份（目前僅支援庫存盤點表）');
+      if (!p.data || typeof p.data !== 'object') throw new Error('備份檔內沒有 data 欄位');
+      const t = Date.parse(p.time) || 0;
+      if (!best[p.app] || t > best[p.app].t) best[p.app] = { w, app:APPS.find(a => a.id === w.appId), fileName:f.name, payload:p, t };
+    } catch (err) { bad.push({ fileName:f.name, error:err.message }); }
+  }
+  wItems = Object.values(best).map(b => ({ ...b, count:Object.values(b.payload.data).reduce((s,v) => s + (Array.isArray(v) ? v.length : 0), 0) })).concat(bad);
+  renderWrite();
+};
+
+function renderWrite(){
+  const s = document.getElementById('status');
+  const ok = wItems.filter(i => !i.error).length;
+  let html = `<h2>寫入：辨識到 ${ok} 項</h2>`;
+  if (location.protocol === 'file:') html += `<p style="color:#d0665b">目前是用檔案方式開啟，寫入的資料無法被其他頁面讀到。請改用網址開啟。</p>`;
+  wItems.forEach((it, i) => {
+    html += it.error
+      ? `<div class="wrow" style="cursor:default"><div><div class="wn">${it.fileName}</div><div class="ws err" id="ws-${i}">${it.error}</div></div></div>`
+      : `<label class="wrow"><input type="checkbox" data-wi="${i}" checked><div><div class="wn">${it.app.name}</div><div class="ws ok" id="ws-${i}">${it.fileName}<br>備份時間 ${fmtT(it.payload.time)}，共 ${it.count} 筆</div></div></label>`;
+  });
+  if (ok) html += `<button class="wgo" id="w-go">確認寫入</button><p class="tail">會取代該頁面目前的資料。請用與平常開啟那些頁面相同的方式開啟本頁。</p>`;
+  s.innerHTML = html; s.classList.add('show');
+  s.scrollIntoView({ behavior:'smooth', block:'center' });
+  const go = document.getElementById('w-go');
+  if (go) go.onclick = doWrite;
+}
+
+function doWrite(){
+  const sel = [...document.querySelectorAll('input[data-wi]:checked')].map(c => +c.dataset.wi);
+  if (!sel.length) { alert('請至少勾選一個項目'); return; }
+  if (!confirm(`即將寫入 ${sel.length} 個項目，會取代該頁面目前的資料，確定嗎？`)) return;
+  sel.forEach(i => {
+    const it = wItems[i], st = document.getElementById('ws-' + i);
+    try {
+      const data = it.payload.data;
+      localStorage.setItem(it.w.stateKey, JSON.stringify({ v:1, time:new Date().toISOString(), data }));
+      localStorage.setItem(it.w.backupKey, JSON.stringify({ time:it.payload.time, data }));
+      const back = JSON.parse(localStorage.getItem(it.w.stateKey));
+      if (JSON.stringify(back.data) !== JSON.stringify(data)) throw new Error('寫入後驗證不符');
+      st.className = 'ws done';
+      st.innerHTML = `✓ 已寫入 ${it.count} 筆 <a class="wopen" href="${it.app.file}">開啟</a>`;
+    } catch (err) { st.className = 'ws err'; st.textContent = '✗ 寫入失敗：' + err.message; }
+  });
+}
 </script>
 </body>
 </html>
