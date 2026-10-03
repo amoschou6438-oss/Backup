@@ -129,6 +129,12 @@
   .wopen{ margin-left:auto; color:var(--gold); font-size:13px; border:1px solid var(--gold-dim); padding:5px 10px; border-radius:6px; text-decoration:none; white-space:nowrap; }
   .wgo{ margin-top:12px; width:100%; padding:12px 0; border-radius:8px; border:1px solid var(--gold); background:var(--gold); color:var(--bg); font-family:inherit; font-size:15px; font-weight:700; letter-spacing:2px; cursor:pointer; }
   .wgo:disabled{ opacity:.4; }
+  .wbar{ display:flex; gap:8px; margin:6px 0 10px; }
+  .wbar .chip{ flex:1; padding:10px 0; }
+  .wf label{ display:block; font-size:12px; color:var(--muted); margin:10px 0 3px; }
+  .wf input[type=text],.wf input[type=password]{ width:100%; padding:9px 10px; border-radius:6px; border:1px solid var(--panel-line); background:var(--bg); color:var(--cream); font-size:14px; font-family:inherit; }
+  .wf .two{ display:flex; gap:6px; } .wf .two input:first-child{ flex:3; } .wf .two input:last-child{ flex:2; }
+  .wf .an{ font-weight:700; font-size:14px; margin-top:12px; }
 </style>
 </head>
 <body>
@@ -136,13 +142,13 @@
 
   <header class="masthead">
     <h1>備份與恢復</h1>
-    <p>勾選項目後按「開始備份」或「開始恢復」；要把備份檔寫入頁面，按「寫入資料」</p>
+    <p>勾選項目後按「開始備份」或「開始恢復」；要把備份寫進 GitHub 上的頁面，按「寫入GitHub」</p>
   </header>
 
   <div class="notes">
     <b>備份</b>：每個項目開啟一個分頁，自動下載備份檔後關閉。<br>
     <b>恢復</b>：先找到該項目的「一鍵備份」JSON 檔，在跳出的畫面中選擇它。<br>
-    <b>寫入</b>：按「寫入資料」，一次選多個備份 JSON，按「確認寫入」即直接寫進對應頁面（需與各頁面在同一網站，並用相同方式開啟）。<br>
+    <b>寫入</b>：按「寫入GitHub」，選備份 JSON，按「確認寫入」即把資料直接寫進 GitHub 倉庫裡該頁面的 HTML，網址重新整理後就是新版（首次需到「設定」填權杖與倉庫）。<br>
     手機瀏覽器若提示「已封鎖快顯視窗」，請選擇允許。
   </div>
 
@@ -162,7 +168,7 @@
   <div class="bottom-inner">
     <button id="btn-backup">開始備份</button>
     <button id="btn-restore">開始恢復</button>
-    <button id="btn-write">寫入資料</button>
+    <button id="btn-write">寫入GitHub</button>
     <input type="file" id="w-file" accept=".json,application/json" multiple hidden>
   </div>
 </div>
@@ -245,38 +251,36 @@ function runBatch(action){
 
 document.getElementById('btn-backup').onclick = () => runBatch('autobackup');
 document.getElementById('btn-restore').onclick = () => runBatch('autorestore');
-// ===== 寫入資料：把備份 JSON 直接寫進各頁面的瀏覽器儲存空間 =====
-// 每個項目：detect 判斷備份檔屬於誰、count 顯示筆數、apply 寫入 localStorage（key 與各頁面自己的一致）
-const LS = (k, v) => localStorage.setItem(k, typeof v === 'string' ? v : JSON.stringify(v));
-const LSget = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) || d; } catch (e) { return d; } };
+// ===== 寫入 GitHub：把備份資料「烤」進倉庫裡的 HTML =====
+// 做法：在 HTML 的 <head> 最前面放一小段程式，內含這份備份要寫入的資料；
+// 頁面載入時若發現這是「新的一版」，就把資料寫進該頁面自己的儲存空間（每個版本每台裝置只寫一次）。
 const isObj = x => x && typeof x === 'object' && !Array.isArray(x);
 const keysN = o => isObj(o) ? Object.keys(o).length : 0;
 
-// 學人／青少／童蒙三班結構相同，只有 key 與生日欄位不同
 function classWriter(appId, exportType, dataKey, recKey, bdFields) {
   return {
     appId,
     detect: p => p.exportType === exportType,
     count: p => `${p.members.length} 筆人員、${keysN(p.monthlyRecord)} 位學員出席記錄`,
-    apply: p => {
+    apply: (p, io) => {
       if (!Array.isArray(p.members) || !p.members.length) throw new Error('備份檔內找不到人員名單');
       const members = p.members.map(m => Object.assign({}, m, { familyOrder: m.familyOrder != null ? m.familyOrder : 1 }));
       if (appId === 'xrb') members.forEach((m, i) => { m.no = i + 1; });
       const d = { members, staffNames: p.staffNames || '', noBentoNames: p.noBentoNames || '' };
       bdFields.forEach(f => { d[f] = p[f] || {}; });
-      LS(dataKey, d);
-      if (isObj(p.monthlyRecord)) LS(recKey, p.monthlyRecord);
-      return [dataKey, recKey];
+      io.set(dataKey, d);
+      if (isObj(p.monthlyRecord)) io.set(recKey, p.monthlyRecord);
     }
   };
 }
 
+// io.set：直接覆蓋該 key；io.merge：按日期合併進現有資料
 const WRITERS = [
   { appId:'inv', detect: p => p.app === 'inventory-count-backup',
     count: p => Object.values(p.data || {}).reduce((s, v) => s + (Array.isArray(v) ? v.length : 0), 0) + ' 筆品項',
-    apply: p => { if (!isObj(p.data)) throw new Error('備份檔內沒有 data 欄位');
-      LS('inventory_count_state_v1', { v:1, time:new Date().toISOString(), data:p.data });
-      LS('inventory_count_backup_v1', { time:p.time, data:p.data }); return ['inventory_count_state_v1']; } },
+    apply: (p, io) => { if (!isObj(p.data)) throw new Error('備份檔內沒有 data 欄位');
+      io.set('inventory_count_state_v1', { v:1, time:new Date().toISOString(), data:p.data });
+      io.set('inventory_count_backup_v1', { time:p.time, data:p.data }); } },
 
   classWriter('xrb', 'xrb_full_backup', 'xrb_data_v2',  'xrb_monthly_record_v1', ['memberBirthdayExtra']),
   classWriter('xqs', 'qsb_full_backup', 'qsb_data',     'qsb_monthly_record_v1', ['studentBirthdayExtra', 'parentBirthdayExtra']),
@@ -284,48 +288,93 @@ const WRITERS = [
 
   { appId:'sb', detect: p => p.type === 'sanban_roster_export',
     count: p => keysN(p.data) + ' 組名單資料',
-    apply: p => { if (!isObj(p.data)) throw new Error('備份檔內沒有 data 欄位'); LS('sanban_roster_state_v1', p.data); return ['sanban_roster_state_v1']; } },
+    apply: (p, io) => { if (!isObj(p.data)) throw new Error('備份檔內沒有 data 欄位'); io.set('sanban_roster_state_v1', p.data); } },
 
   // 茶會帳本的備份檔沒有標記，以內容（members + records，且不是班級備份）判斷
   { appId:'th', detect: p => Array.isArray(p.members) && Array.isArray(p.records) && !p.exportType,
     count: p => `${p.members.length} 位成員、${p.records.length} 筆收支`,
-    apply: p => { LS('tea-ledger-data', p); return ['tea-ledger-data']; } },
+    apply: (p, io) => { io.set('tea-ledger-data', p); } },
 
   { appId:'cal', detect: p => p.type === 'calendar-backup',
     count: p => `行事曆 ${keysN(p.events)} 天、例行 ${(p.routines || []).length}、生日 ${(p.birthdays || []).length}、特殊 ${(p.specials || []).length}`,
-    apply: p => {
-      LS('calendar-events-v1', isObj(p.events) ? p.events : {});
-      LS('calendar-routines-v1', Array.isArray(p.routines) ? p.routines : []);
-      LS('calendar-birthdays-v1', Array.isArray(p.birthdays) ? p.birthdays : []);
-      LS('calendar-specials-v1', Array.isArray(p.specials) ? p.specials : []);
-      return ['calendar-events-v1', 'calendar-routines-v1', 'calendar-birthdays-v1', 'calendar-specials-v1'];
+    apply: (p, io) => {
+      io.set('calendar-events-v1', isObj(p.events) ? p.events : {});
+      io.set('calendar-routines-v1', Array.isArray(p.routines) ? p.routines : []);
+      io.set('calendar-birthdays-v1', Array.isArray(p.birthdays) ? p.birthdays : []);
+      io.set('calendar-specials-v1', Array.isArray(p.specials) ? p.specials : []);
     } },
 
-  // 公司排程系統：備份只含當月＋下月，因此以「按日期合併」方式寫入（與該頁面自己的還原行為一致）
+  // 公司排程系統：備份只含當月＋下月，因此按日期合併，不會清掉其他月份
   { appId:'gs', detect: p => p.type === 'der-life-full-monthly-backup',
     count: p => `排程 ${keysN(p.schedule)} 天、盤點欄位 ${keysN(p.inventory)} 個、叫貨 ${keysN(p.orderSched)} 天（${p.year}年${p.month}月起）`,
-    apply: p => {
-      const sched = LSget('schedule_v2', {});
-      try { LS('schedule_v2_backup_before_json_import', sched); } catch (e) {}
-      Object.keys(p.schedule || {}).forEach(k => { sched[k] = p.schedule[k]; });
-      LS('schedule_v2', sched);
-      const os = LSget('order_sched_v1', {}); Object.keys(p.orderSched || {}).forEach(k => { os[k] = p.orderSched[k]; }); LS('order_sched_v1', os);
-      const oa = LSget('order_arrival_v1', {}); Object.keys(p.orderArrival || {}).forEach(k => { oa[k] = p.orderArrival[k]; }); LS('order_arrival_v1', oa);
-      Object.keys(p.inventory || {}).forEach(id => localStorage.setItem('inp_' + id, p.inventory[id]));
-      return ['schedule_v2', 'order_sched_v1', 'order_arrival_v1'];
+    apply: (p, io) => {
+      io.merge('schedule_v2', p.schedule || {});
+      io.merge('order_sched_v1', p.orderSched || {});
+      io.merge('order_arrival_v1', p.orderArrival || {});
+      Object.keys(p.inventory || {}).forEach(id => io.set('inp_' + id, String(p.inventory[id])));
     } },
 ];
 
-// 已知格式但無法用此方式寫入的備份
 const UNSUPPORTED = [
-  { detect: p => p.type === 'meal-entries-backup', why:'戶外活動餐點彙整的資料不是存在瀏覽器裡，無法由本頁寫入' },
+  { detect: p => p.type === 'meal-entries-backup', why:'戶外活動餐點彙整的資料不是存在瀏覽器裡，無法用這個方式寫入' },
 ];
 
-let wItems = [];
+// ---- 產生要插入 HTML 的區塊 ----
+const EMB_START = '<!--EMB-BACKUP-START-->', EMB_END = '<!--EMB-BACKUP-END-->';
+const makeIO = () => { const set = {}, merge = {};
+  return { set:(k, v) => { set[k] = typeof v === 'string' ? v : JSON.stringify(v); },
+           merge:(k, o) => { merge[k] = Object.assign(merge[k] || {}, o); }, out:{ set, merge } }; };
+function makeBlock(id, out){
+  const E = { id, t:new Date().toISOString(), set:out.set, merge:out.merge };
+  const json = JSON.stringify(E).replace(/</g, '\\u003c').replace(/\u2028|\u2029/g, '');
+  return EMB_START + '<script>(function(){try{var E=' + json + ';var mk="emb_applied_"+E.id;if(localStorage.getItem(mk)===E.t)return;var k,d,o,s;for(k in E.set)localStorage.setItem(k,E.set[k]);for(k in E.merge){o={};try{o=JSON.parse(localStorage.getItem(k))||{}}catch(e){}s=E.merge[k];for(d in s)o[d]=s[d];localStorage.setItem(k,JSON.stringify(o))}localStorage.setItem(mk,E.t)}catch(e){}})();<\/script>' + EMB_END;
+}
+function inject(html, block){
+  const re = new RegExp(EMB_START + '[\\s\\S]*?' + EMB_END);
+  if (re.test(html)) return html.replace(re, () => block);
+  const m = html.match(/<head[^>]*>/i);
+  if (!m) throw new Error('HTML 內找不到 <head>');
+  return html.replace(m[0], () => m[0] + '\n' + block);
+}
+
+// ---- GitHub 設定（存在本機瀏覽器）----
+const CFG_KEY = 'bk_github_cfg_v1';
+let cfg = {}; try { cfg = JSON.parse(localStorage.getItem(CFG_KEY)) || {}; } catch (e) {}
+cfg.token = cfg.token || ''; cfg.apps = cfg.apps || {};
+if (!cfg.apps.xqs) cfg.apps.xqs = { repo:'amoschou6438-oss/Young-class', path:'index.html' };
+const saveCfg = () => { try { localStorage.setItem(CFG_KEY, JSON.stringify(cfg)); } catch (e) {} };
+const WAPPS = WRITERS.map(w => w.appId).filter((v, i, a) => a.indexOf(v) === i).map(id => APPS.find(a => a.id === id));
+const ready = id => cfg.apps[id] && /^[^\/\s]+\/[^\/\s]+$/.test(cfg.apps[id].repo || '') && (cfg.apps[id].path || '').trim();
+
+const gh = (path, opt = {}) => fetch('https://api.github.com' + path, Object.assign({}, opt, { headers:Object.assign({ Authorization:'Bearer ' + cfg.token, 'X-GitHub-Api-Version':'2022-11-28' }, opt.headers || {}) }));
+const httpMsg = st => st === 401 ? '權杖無效或已過期' : st === 403 ? '權杖權限不足（需要該倉庫的 Contents 讀寫權限）' : st === 404 ? '找不到倉庫或檔案，或權杖沒有該倉庫的權限' : (st === 409 || st === 422) ? '檔案剛被更改，請重試' : 'GitHub 回應錯誤 ' + st;
+function b64(str){ const u = new TextEncoder().encode(str); let bin = ''; for (let i = 0; i < u.length; i += 0x8000) bin += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000)); return btoa(bin); }
+const pagesUrl = repo => { const [o, n] = repo.split('/'); return n.toLowerCase() === (o + '.github.io').toLowerCase() ? `https://${o}.github.io/` : `https://${o}.github.io/${n}/`; };
+
+async function bakeOne(it){
+  const c = cfg.apps[it.app.id];
+  const cp = '/repos/' + c.repo + '/contents/' + c.path.trim().split('/').map(encodeURIComponent).join('/');
+  const meta = await gh(cp, { headers:{ Accept:'application/vnd.github.object+json' } });
+  if (!meta.ok) throw new Error(httpMsg(meta.status));
+  const mj = await meta.json();
+  if (!mj || mj.type !== 'file') throw new Error('路徑不是檔案，請檢查設定');
+  const raw = await gh(cp, { headers:{ Accept:'application/vnd.github.raw+json' } });
+  if (!raw.ok) throw new Error(httpMsg(raw.status));
+  const old = await raw.text();
+  const io = makeIO(); it.w.apply(it.payload, io);
+  const next = inject(old, makeBlock(it.app.id, io.out));
+  const put = await gh(cp, { method:'PUT', headers:{ Accept:'application/vnd.github+json', 'Content-Type':'application/json' },
+    body:JSON.stringify({ message:`自動寫入備份資料（${it.app.name}）`, content:b64(next), sha:mj.sha }) });
+  if (!put.ok) throw new Error(httpMsg(put.status));
+}
+
+// ---- 畫面 ----
+let wItems = [], showSet = false;
 const fmtT = iso => { const d = new Date(iso); if (isNaN(d)) return ''; const p = n => String(n).padStart(2,'0'); return `${d.getFullYear()}/${p(d.getMonth()+1)}/${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`; };
 const payloadTime = p => Date.parse(p.time || p.exportDate || p.exportedAt) || 0;
+const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]));
 
-document.getElementById('btn-write').onclick = () => document.getElementById('w-file').click();
+document.getElementById('btn-write').onclick = () => { showSet = !cfg.token; renderWrite(); };
 document.getElementById('w-file').onchange = async e => {
   const files = [...e.target.files]; e.target.value = '';
   if (!files.length) return;
@@ -342,40 +391,60 @@ document.getElementById('w-file').onchange = async e => {
       if (!best[w.appId] || t > best[w.appId].t) best[w.appId] = { w, app:APPS.find(a => a.id === w.appId), fileName:f.name, payload:p, t };
     } catch (err) { bad.push({ fileName:f.name, error:err.message }); }
   }
-  wItems = Object.values(best).map(b => { let c = ''; try { c = b.w.count(b.payload); } catch (e) {} return { ...b, count:c }; }).concat(bad);
-  renderWrite();
+  wItems = Object.values(best).map(b => { let c = ''; try { c = b.w.count(b.payload); } catch (e) {} return Object.assign({}, b, { count:c }); }).concat(bad);
+  showSet = false; renderWrite();
 };
 
 function renderWrite(){
   const s = document.getElementById('status');
-  const ok = wItems.filter(i => !i.error).length;
-  let html = `<h2>寫入：辨識到 ${ok} 項</h2>`;
-  if (location.protocol === 'file:') html += `<p style="color:#d0665b">目前是用檔案方式開啟，寫入的資料無法被其他頁面讀到。請改用網址開啟。</p>`;
-  wItems.forEach((it, i) => {
-    html += it.error
-      ? `<div class="wrow" style="cursor:default"><div><div class="wn">${it.fileName}</div><div class="ws err" id="ws-${i}">${it.error}</div></div></div>`
-      : `<label class="wrow"><input type="checkbox" data-wi="${i}" checked><div><div class="wn">${it.app.name}</div><div class="ws ok" id="ws-${i}">${it.fileName}<br>${fmtT(it.t) ? '備份時間 ' + fmtT(it.t) + '，' : ''}${it.count}</div></div></label>`;
-  });
-  if (ok) html += `<button class="wgo" id="w-go">確認寫入</button><p class="tail">會取代該頁面目前的資料（公司排程系統則按日期合併）。請用與平常開啟那些頁面相同的方式開啟本頁；若該頁面正開在其他分頁，請先關閉再寫入。</p>`;
-  s.innerHTML = html; s.classList.add('show');
+  let h = `<h2>寫入 GitHub</h2><div class="wbar"><button class="chip" id="w-pick">選擇備份檔</button><button class="chip" id="w-set">⚙ 設定</button></div>`;
+  if (showSet) {
+    h += `<div class="wf"><p style="margin:0 0 4px">權杖與倉庫只存在這支手機的瀏覽器裡。權杖請建立「Fine-grained」，只勾要更新的倉庫，權限 Contents 設為 Read and write。</p>
+      <label>GitHub 權杖</label><input type="password" id="f-token" value="${esc(cfg.token)}" autocomplete="off">`;
+    WAPPS.forEach(a => { const c = cfg.apps[a.id] || {};
+      h += `<div class="an">${a.name}</div><div class="two"><input type="text" data-r="${a.id}" placeholder="帳號/倉庫名" value="${esc(c.repo || '')}"><input type="text" data-p="${a.id}" placeholder="檔案路徑" value="${esc(c.path || 'index.html')}"></div>`; });
+    h += `<button class="wgo" id="f-save">儲存設定</button></div>`;
+  } else if (wItems.length) {
+    const ok = wItems.filter(i => !i.error).length;
+    h += `<p style="margin:0 0 4px">辨識到 ${ok} 項</p>`;
+    wItems.forEach((it, i) => {
+      if (it.error) { h += `<div class="wrow" style="cursor:default"><div><div class="wn">${esc(it.fileName)}</div><div class="ws err" id="ws-${i}">${esc(it.error)}</div></div></div>`; return; }
+      const r = ready(it.app.id);
+      h += `<label class="wrow"><input type="checkbox" data-wi="${i}" ${r ? 'checked' : 'disabled'}><div><div class="wn">${it.app.name}</div>
+        <div class="ws ok" id="ws-${i}">${esc(it.fileName)}<br>${fmtT(it.t) ? '備份時間 ' + fmtT(it.t) + '，' : ''}${esc(it.count)}<br>${r ? '→ ' + esc(cfg.apps[it.app.id].repo) + '／' + esc(cfg.apps[it.app.id].path) : '<span style="color:#d0665b">尚未設定倉庫，請按「設定」</span>'}</div></div></label>`;
+    });
+    if (ok) h += `<button class="wgo" id="w-go">確認寫入 GitHub</button><p class="tail">會直接修改 GitHub 倉庫裡的 HTML（留下一筆提交，可在 GitHub 還原）。網站約 1～2 分鐘後更新；每台裝置第一次打開新版時，會用這份備份取代該頁面原有資料。</p>`;
+  } else h += `<p class="tail">先按「選擇備份檔」，可一次選多個 JSON。</p>`;
+  s.innerHTML = h; s.classList.add('show');
   s.scrollIntoView({ behavior:'smooth', block:'center' });
+  document.getElementById('w-pick').onclick = () => document.getElementById('w-file').click();
+  document.getElementById('w-set').onclick = () => { showSet = !showSet; renderWrite(); };
+  const sv = document.getElementById('f-save');
+  if (sv) sv.onclick = () => {
+    cfg.token = document.getElementById('f-token').value.trim();
+    WAPPS.forEach(a => { cfg.apps[a.id] = { repo:document.querySelector(`[data-r="${a.id}"]`).value.trim(), path:document.querySelector(`[data-p="${a.id}"]`).value.trim() || 'index.html' }; });
+    saveCfg(); showSet = false; renderWrite();
+  };
   const go = document.getElementById('w-go');
   if (go) go.onclick = doWrite;
 }
 
-function doWrite(){
+async function doWrite(){
+  if (!cfg.token) { alert('請先到「設定」填入 GitHub 權杖'); return; }
   const sel = [...document.querySelectorAll('input[data-wi]:checked')].map(c => +c.dataset.wi);
   if (!sel.length) { alert('請至少勾選一個項目'); return; }
-  if (!confirm(`即將寫入 ${sel.length} 個項目，確定嗎？`)) return;
-  sel.forEach(i => {
+  if (!confirm(`即將修改 GitHub 上 ${sel.length} 個頁面的 HTML，確定嗎？`)) return;
+  const go = document.getElementById('w-go'); go.disabled = true;
+  for (const i of sel) {
     const it = wItems[i], st = document.getElementById('ws-' + i);
+    st.className = 'ws'; st.textContent = '寫入中…';
     try {
-      const keys = it.w.apply(it.payload);
-      keys.forEach(k => { if (localStorage.getItem(k) === null) throw new Error('寫入後讀不到 ' + k); });
+      await bakeOne(it);
       st.className = 'ws done';
-      st.innerHTML = `✓ 已寫入（${it.count}） <a class="wopen" href="${it.app.file}">開啟</a>`;
+      st.innerHTML = `✓ 已更新 GitHub（${esc(it.count)}） <a class="wopen" href="${pagesUrl(cfg.apps[it.app.id].repo)}" target="_blank">開啟網站</a>`;
     } catch (err) { st.className = 'ws err'; st.textContent = '✗ 寫入失敗：' + err.message; }
-  });
+  }
+  go.disabled = false;
 }
 </script>
 </body>
