@@ -1643,6 +1643,7 @@ body{font-family:'Noto Sans TC',sans-serif;color:var(--ink);
 
       <div class="input-block" style="--label-w:9.5em">
         <div class="input-block-title">🍗 G腿拌料庫存</div>
+        <div class="irow"><label>杏鮑菇</label><div class="ifield"><input type="number" id="home_inv_gleg_mushroom_left" min="0" step="0.1" oninput="window.homeSyncStock('home_inv_gleg_mushroom_left','inv_gleg_mushroom_left_inv')"><span class="unit">鍋</span></div></div>
         <div class="irow"><label>G腿拌粉</label><div class="ifield"><input type="number" id="home_inv_gleg_powder_left" min="0" step="0.1" oninput="window.homeSyncStock('home_inv_gleg_powder_left','inv_gleg_powder_left_inv')"><span class="unit">公斤</span></div></div>
         <div class="irow"><label>G腿肉片</label><div class="ifield"><input type="number" id="home_inv_gleg_meat_left" min="0" step="0.1" oninput="window.homeSyncStock('home_inv_gleg_meat_left','inv_gleg_meat_left_inv')"><span class="unit">鍋</span></div></div>
         <div class="irow"><label>G腿黏膠</label><div class="ifield"><input type="number" id="home_inv_gleg_glue_left" min="0" step="0.1" oninput="window.homeSyncStock('home_inv_gleg_glue_left','inv_gleg_glue_left_inv')"><span class="unit">鍋</span></div></div>
@@ -1932,6 +1933,13 @@ body{font-family:'Noto Sans TC',sans-serif;color:var(--ink);
       <div class="input-block" style="--label-w:9.5em">
         <div class="input-block-title">🍗 G腿拌料庫存</div>
         <div class="irow">
+          <label>杏鮑菇</label>
+          <div class="ifield">
+            <input type="number" id="inv_gleg_mushroom_left_inv" value="0" min="0" step="0.1" oninput="saveInputs()">
+            <span class="unit">鍋</span>
+          </div>
+        </div>
+        <div class="irow">
           <label>G腿拌粉</label>
           <div class="ifield">
             <input type="number" id="inv_gleg_powder_left_inv" value="0" min="0" step="0.1"
@@ -2117,6 +2125,7 @@ body{font-family:'Noto Sans TC',sans-serif;color:var(--ink);
           <span style="font-size:12px;color:var(--ink3)">← 自動帶入製作數量輸入頁的G腿數值；也可手動修改</span>
         </div>
         <div id="gleg-sauce-recipe" class="daily-chips"></div>
+        <div class="notice" style="margin-top:8px;margin-bottom:4px;background:#fff8e1;border-color:var(--gold)">🆕 新增調味料：<strong>鹽 3兩/鍋</strong>（已加入G腿醬調味料計算）</div>
         <div class="notice" style="margin-top:12px;margin-bottom:4px">
           ※ G腿醬每盆重 <strong id="gleg-sauce-per-basin">—</strong>，備料時請依此計算盆數
         </div>
@@ -2294,6 +2303,7 @@ body{font-family:'Noto Sans TC',sans-serif;color:var(--ink);
           </div>
         </div>
         <div id="manual-gleg-sauce-recipe" class="daily-chips"></div>
+        <div class="notice" style="margin-top:8px;margin-bottom:4px;background:#fff8e1;border-color:var(--gold)">🆕 新增調味料：<strong>鹽 3兩/鍋</strong>（已加入G腿醬調味料計算）</div>
         <div class="notice" style="margin-top:12px;margin-bottom:4px">
           ※ G腿醬每盆重 <strong id="manual-gleg-sauce-per-basin">—</strong>，備料時請依此計算盆數
         </div>
@@ -6724,6 +6734,7 @@ var glegSauceData = [
   { name: '胡椒粉',  base: 2.5, unit: '兩' },
   { name: '五香粉',  base: 0.2, unit: '兩' },
   { name: '水',      base: 3,   unit: '兩' },
+  { name: '鹽',      base: 3,   unit: '兩', saveIdx: 100, isNew: true },
 ];
 
 function recalcGlegSauce() {
@@ -6785,7 +6796,7 @@ function recalcGlegSauce() {
     if (item.unit === '兩') totalLiangAll += totalLiang;
     else if (item.unit === '斤') totalLiangAll += totalLiang * 16;
     var jinStr = liangDisplay(totalLiang);
-    var saved = glegLoad(SAUCE_GLEG_OFFSET + i);
+    var saved = glegLoad(item.saveIdx != null ? item.saveIdx : SAUCE_GLEG_OFFSET + i);
     var w = parseFloat(saved.w);
     var convStr;
     if (w > 0) {
@@ -6831,7 +6842,7 @@ function recalcManualSauce() {
     if (item.unit === '兩') totalLiangAll += totalLiang;
     else if (item.unit === '斤') totalLiangAll += totalLiang * 16;
     var jinStr = liangDisplay(totalLiang);
-    var saved = glegLoad(SAUCE_GLEG_OFFSET + i);
+    var saved = glegLoad(item.saveIdx != null ? item.saveIdx : SAUCE_GLEG_OFFSET + i);
     var w = parseFloat(saved.w);
     var convStr;
     if (w > 0) {
@@ -6955,7 +6966,7 @@ function recalcDaily() {
   if (schedHasGleg)   recalcGlegSauce();
 }
 
-var INPUT_IDS = ['q_wonton','q_wonton_fill','inv_gleg_powder_left_inv','inv_gleg_meat_left_inv','inv_gleg_glue_left_inv','inv_gleg_sauce_orig_left_inv','inv_gleg_sauce_spicy_left_inv','q_dumplings_xc','q_dumplings_hq','q_dumplings_hq_fill','q_minced','q_minced_chili','q_mushr_shred','q_curry','q_pepper_salt','q_triangle','q_gleg','q_gleg_times','q_gleg_powder_left','q_zongzi_d','q_zongzi_c','q_oily_rice','q_monkey_rice','inv_mushrHead','inv_mince','inv_radish','inv_soJiang','inv_gLegFill','inv_gLegFill_deduct','inv_zRadish','inv_mushroom','inv_mushroom_deduct','inv_redMeat','inv_redMeat_deduct','inv_whiteMeat','inv_whiteMeat_deduct','inv_corner','inv_corner_deduct','inv_chestnut','inv_chestnut_deduct','q_tri_left','q_tri_fry','q_tri_next','inv_wonton_frozen','inv_wonton_actual_fry','inv_wonton_cur_input','inv_wonton_next','inv_wonton_next2','inv_wonton_next3','inv_wonton_glue','rmk_gLegFill','rmk_zRadish','rmk_mushroom','rmk_redMeat','rmk_whiteMeat','rmk_corner','rmk_chestnut','rmk_riceTop','rmk_redShred','rmk_riceMushr','rmk_riceSource'];
+var INPUT_IDS = ['q_wonton','q_wonton_fill','inv_gleg_mushroom_left_inv','inv_gleg_powder_left_inv','inv_gleg_meat_left_inv','inv_gleg_glue_left_inv','inv_gleg_sauce_orig_left_inv','inv_gleg_sauce_spicy_left_inv','q_dumplings_xc','q_dumplings_hq','q_dumplings_hq_fill','q_minced','q_minced_chili','q_mushr_shred','q_curry','q_pepper_salt','q_triangle','q_gleg','q_gleg_times','q_gleg_powder_left','q_zongzi_d','q_zongzi_c','q_oily_rice','q_monkey_rice','inv_mushrHead','inv_mince','inv_radish','inv_soJiang','inv_gLegFill','inv_gLegFill_deduct','inv_zRadish','inv_mushroom','inv_mushroom_deduct','inv_redMeat','inv_redMeat_deduct','inv_whiteMeat','inv_whiteMeat_deduct','inv_corner','inv_corner_deduct','inv_chestnut','inv_chestnut_deduct','q_tri_left','q_tri_fry','q_tri_next','inv_wonton_frozen','inv_wonton_actual_fry','inv_wonton_cur_input','inv_wonton_next','inv_wonton_next2','inv_wonton_next3','inv_wonton_glue','rmk_gLegFill','rmk_zRadish','rmk_mushroom','rmk_redMeat','rmk_whiteMeat','rmk_corner','rmk_chestnut','rmk_riceTop','rmk_redShred','rmk_riceMushr','rmk_riceSource'];
 function saveInputs() {
   INPUT_IDS.forEach(function(id) {
     try { var el = document.getElementById(id); if (el) localStorage.setItem('inp_'+id, el.value); } catch(e){}
@@ -9976,6 +9987,7 @@ function recalcOilySeasoning() {
       { name: '胡椒粉',  base: 2.5, unit: '兩', defaultPkgG: 600,  defaultPkgUnit: '包', defaultPkgDesc: '1包1斤' },
       { name: '五香粉',  base: 0.2, unit: '兩', defaultPkgG: 600,  defaultPkgUnit: '包', defaultPkgDesc: '1包1斤' },
       { name: '水',      base: 3,   unit: '兩' },
+      { name: '鹽',      base: 3,   unit: '兩', saveIdx: 100, isNew: true },
     ];
 
     function sauceLiangDisplay(liang) {
@@ -10007,7 +10019,7 @@ function recalcOilySeasoning() {
 
     var chipsHtml = glegSauceDataLocal.map(function(item, i) {
       var totalLiang = Math.ceil(item.base * effPots);
-      var saved = glegLoad(SAUCE_GLEG_OFFSET + i);
+      var saved = glegLoad(item.saveIdx != null ? item.saveIdx : SAUCE_GLEG_OFFSET + i);
       var w = parseFloat(saved.w);
       // 使用者設定的包裝重量優先；否則使用 condimentDisplay 標準換算
       var rawStr = sauceLiangDisplay(totalLiang);
@@ -10107,6 +10119,7 @@ function recalcOilySeasoning() {
     h += '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">';
     h += chipsHtml;
     h += '</div>';
+    h += '<div style="font-size:12px;color:#7b2d00;background:#fff8e1;border:1px solid #e8c56a;border-radius:6px;padding:5px 10px;margin-bottom:8px">🆕 新增調味料：<strong>鹽 3兩/鍋</strong></div>';
     h += '<div style="font-size:11px;color:#7a6040;margin-top:4px;padding-top:8px;border-top:1px solid #e8c56a">';
     if (perBasinRegularStr !== null && perBasinSpicyStr !== null) {
       // 有辣有不辣：分別顯示兩種每盆重
@@ -10866,7 +10879,7 @@ function recalcOilySeasoning() {
     });
     h += '</div>';
     h += '<div style="font-size:11px;color:#555;background:rgba(255,255,255,0.6);border-radius:5px;padding:5px 10px;line-height:1.7">'
-      + '猴菇各 <strong>11包</strong>，二鍋約 <strong>260包</strong>成品。鈕扣菇泡 <strong>3斤</strong>即可（新的）'
+      + '猴菇 <strong>33斤/鍋</strong>，二鍋約 <strong>260包</strong>成品。<br>煮2鍋的話鈕扣菇泡 <strong>3斤</strong>即可（新的）<br>左邊鍋水量食指二指幅、<br>右邊鍋水量二指幅又0.5 cm。'
       + '</div>';
     h += '</div>';
     el.innerHTML = h;
@@ -20456,6 +20469,7 @@ function debugFixNow() {
       ['home_inv_wonton_frozen', 'inv_wonton_frozen'],
       ['home_inv_wonton_actual_fry', 'inv_wonton_actual_fry'],
       ['home_inv_wonton_glue', 'inv_wonton_glue'],
+      ['home_inv_gleg_mushroom_left', 'inv_gleg_mushroom_left_inv'],
       ['home_inv_gleg_powder_left', 'inv_gleg_powder_left_inv'],
       ['home_inv_gleg_meat_left', 'inv_gleg_meat_left_inv'],
       ['home_inv_gleg_glue_left', 'inv_gleg_glue_left_inv'],
