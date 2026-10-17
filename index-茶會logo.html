@@ -1687,9 +1687,33 @@ function __startDraggableMenu(cfg) {
   document.getElementById('btn-line-report').addEventListener('click', reportLatestToLine);
 
   // ---- JSON 備份匯出/匯入（防止手機儲存空間被清掉時資料遺失）----
+
+// ── 完整備份輔助：打包／還原此頁面存在瀏覽器裡的「全部」資料（localStorage 所有項目）──
+function __bkSnapshotLS(skip) {
+  const o = {};
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (skip && skip.indexOf(k) >= 0) continue;
+      o[k] = localStorage.getItem(k);
+    }
+  } catch (e) {}
+  return o;
+}
+function __bkRestoreLS(snap, skip) {
+  if (!snap || typeof snap !== 'object') return 0;
+  let n = 0;
+  Object.keys(snap).forEach(k => {
+    if (skip && skip.indexOf(k) >= 0) return;
+    if (typeof snap[k] !== 'string') return;
+    try { localStorage.setItem(k, snap[k]); n++; } catch (e) {}
+  });
+  return n;
+}
   function backupJSON(){
     try{
-      const raw = JSON.stringify(state, null, 2);
+      const full = Object.assign({}, state, { localStorageAll: __bkSnapshotLS() }); // 含此頁面全部本機資料
+      const raw = JSON.stringify(full, null, 2);
       const blob = new Blob([raw], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -1724,6 +1748,7 @@ function __startDraggableMenu(cfg) {
       if(!confirm('匯入後會覆蓋目前手機上的資料，確定要匯入這份備份嗎？')){
         return;
       }
+      if(data.localStorageAll){ __bkRestoreLS(data.localStorageAll, [STORAGE_KEY]); delete data.localStorageAll; }
       state = data;
       ensureRecordIds();
       await save();

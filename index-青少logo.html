@@ -1960,7 +1960,31 @@ function handleImportMonthlyRecord(event) {
 // 整合：人員名單（含身份／乾坤／地區／參班／茶會）、出席記錄、學員資料（理天生日／出生日期）、
 //       資輔家長生日（姓氏／出生日期），一次備份／恢復成單一檔案
 // ══════════════════════════════════════════
+
+// ── 完整備份輔助：打包／還原此頁面存在瀏覽器裡的「全部」資料（localStorage 所有項目）──
+function __bkSnapshotLS(skip) {
+  const o = {};
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (skip && skip.indexOf(k) >= 0) continue;
+      o[k] = localStorage.getItem(k);
+    }
+  } catch (e) {}
+  return o;
+}
+function __bkRestoreLS(snap, skip) {
+  if (!snap || typeof snap !== 'object') return 0;
+  let n = 0;
+  Object.keys(snap).forEach(k => {
+    if (skip && skip.indexOf(k) >= 0) return;
+    if (typeof snap[k] !== 'string') return;
+    try { localStorage.setItem(k, snap[k]); n++; } catch (e) {}
+  });
+  return n;
+}
 function exportFullBackup() {
+  try { saveData(); } catch (e) {}
   loadMonthlyRecord();
   const data = {
     exportType: 'qsb_full_backup',
@@ -1975,7 +1999,9 @@ function exportFullBackup() {
     noBentoNames: document.getElementById('no-bento-names')?.value || '',
     studentBirthdayExtra: studentBirthdayExtra,
     parentBirthdayExtra:  parentBirthdayExtra,
-    monthlyRecord: monthlyRecord
+    monthlyRecord: monthlyRecord,
+    // 此頁面存在瀏覽器的全部資料（所有 localStorage 項目），恢復時一併還原
+    localStorageAll: __bkSnapshotLS()
   };
   const json = JSON.stringify(data, null, 2);
   const blob = new Blob([json], { type: 'application/json;charset=utf-8' });
@@ -2020,6 +2046,7 @@ function handleImportFullBackup(event) {
         `恢復後將覆蓋目前的人員名單、出席記錄、學員資料、資輔家長生日，此動作無法復原。`
       );
       if (!ok) { event.target.value = ''; return; }
+      __bkRestoreLS(d.localStorageAll, [LS_KEY_QSB, LS_RECORD_KEY]); // 先還原其餘全部資料，下方再由主資料覆蓋
 
       // 1) 人員名單（含參班／茶會）
       allMembers.length = 0;

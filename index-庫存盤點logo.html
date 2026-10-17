@@ -2856,12 +2856,37 @@ function fmtStamp(d) {
   const p = n => String(n).padStart(2, '0');
   return d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()) + '-' + p(d.getHours()) + p(d.getMinutes());
 }
+
+// ── 完整備份輔助：打包／還原此頁面存在瀏覽器裡的「全部」資料（localStorage 所有項目）──
+function __bkSnapshotLS(skip) {
+  const o = {};
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (skip && skip.indexOf(k) >= 0) continue;
+      o[k] = localStorage.getItem(k);
+    }
+  } catch (e) {}
+  return o;
+}
+function __bkRestoreLS(snap, skip) {
+  if (!snap || typeof snap !== 'object') return 0;
+  let n = 0;
+  Object.keys(snap).forEach(k => {
+    if (skip && skip.indexOf(k) >= 0) return;
+    if (typeof snap[k] !== 'string') return;
+    try { localStorage.setItem(k, snap[k]); n++; } catch (e) {}
+  });
+  return n;
+}
 function buildBackupFile() {
+  try { saveState(); } catch (e) {}
   return {
     app: BACKUP_FILE_TAG,
     version: 1,
     time: new Date().toISOString(),
-    data: JSON.parse(JSON.stringify(DATA))
+    data: JSON.parse(JSON.stringify(DATA)),
+    localStorageAll: __bkSnapshotLS([BACKUP_KEY])   // 此頁面存在瀏覽器的全部資料
   };
 }
 function downloadBackupFile() {
@@ -2886,6 +2911,7 @@ function applyBackupFile(payload) {
   }
   const keys = Object.keys(payload.data).filter(k => Array.isArray(payload.data[k]));
   if (keys.length === 0) throw new Error('備份檔內沒有任何品項資料');
+  __bkRestoreLS(payload.localStorageAll, [STATE_KEY, BACKUP_KEY]);
   let n = 0;
   keys.forEach(k => { DATA[k] = payload.data[k]; n += DATA[k].length; });
   applyItemPatches();
