@@ -65,6 +65,13 @@
     font-size:24px; font-weight:700; margin:0 0 4px; line-height:1.4;
   }
   .sub{font-size:13px; color:#C9D3C1; margin:0;}
+  .download-path-note{
+    margin:18px 4px 0; padding:12px 14px; border-radius:12px;
+    background:rgba(91,75,138,0.08); border:1px dashed #5B4B8A;
+    font-size:13px; line-height:1.7; color:var(--ink);
+  }
+  .download-path-note .dpn-title{font-weight:700; color:#5B4B8A; margin-bottom:4px; font-size:14px;}
+  .download-path-note .dpn-row{margin-top:2px;}
   .bottom-warning{
     margin:28px 0 0;
     text-align:center;
@@ -185,7 +192,10 @@
   .fab-mini-emoji{font-size:14px;}
   .fab-menu.open{pointer-events:auto;}
   .fab-menu.open .fab-mini{opacity:1; transform:translateY(0) scale(1);}
+  .fab-menu.open #fabHomeBtn{transition-delay:0s;}
   .fab-menu.open #fabBackBtn{transition-delay:.02s;}
+  .fab-mini:disabled{opacity:.4 !important; cursor:not-allowed; background:var(--card); border-color:var(--line); box-shadow:none;}
+  .fab-mini:disabled:hover{background:var(--card); border-color:var(--line);}
   .fab-menu.open #fabTopBtn{transition-delay:.06s;}
   .fab-menu.open #fabBottomBtn{transition-delay:.1s;}
   .fab-mini:hover{background:var(--mustard-light); border-color:var(--mustard);}
@@ -514,6 +524,9 @@
   .modal-text{font-size:14px; color:var(--ink); line-height:1.6; margin:0 0 10px;}
   .modal-thanks{font-size:14px; color:var(--moss-dark); font-weight:700; margin:0 0 18px;}
   .modal-actions{display:flex; gap:10px;}
+  .modal-actions .btn{flex:1;}
+  .modal-actions .btn-primary{background:linear-gradient(135deg,#3B5B3E,#28401F); color:#fff; border:none;}
+  .modal-actions .btn-ghost{background:#fff; color:#28401F; border:1px solid #D8DCC9;}
 
   /* radial selector (circle-diagram style) */
   .radial-select-block{
@@ -783,6 +796,11 @@
   <div id="mainView">
     <div class="radial-caption" style="margin-top:0; font-size:30px;">主畫面</div>
     <div class="info-bar-list" id="mainBarList"></div>
+    <div class="download-path-note">
+      <div class="dpn-title">💾 「下載到手機」的檔案位置</div>
+      <div class="dpn-row"><b>📱 Android：</b>「檔案」或「檔案管理」App →「下載」資料夾（Download）</div>
+      <div class="dpn-row"><b>🍎 iPhone：</b>「檔案」App →「我的 iPhone」→「下載項目」資料夾（Safari 可點網址列旁的 ⬇ 圖示直接開啟）</div>
+    </div>
   </div>
 
   <div id="landingView" style="display:none;">
@@ -826,6 +844,7 @@
     <button type="button" class="fab-mini" id="fabBottomBtn">去到底端<span class="fab-mini-emoji">🔚</span></button>
     <button type="button" class="fab-mini" id="fabTopBtn">回到頂端<span class="fab-mini-emoji">🔝</span></button>
     <button type="button" class="fab-mini" id="fabBackBtn">返回主頁<span class="fab-mini-emoji">🔙</span></button>
+    <button type="button" class="fab-mini" id="fabHomeBtn">回到主畫面<span class="fab-mini-emoji">🏠</span></button>
   </div>
   <button type="button" class="fab-main" id="fabMainBtn" aria-label="展開快捷選單">📂</button>
 </div>
@@ -846,6 +865,50 @@
   </div>
 </div>
 
+<script>
+/* 本機儲存：在手機瀏覽器 / 主畫面 App 開啟時，資料存在 localStorage，關閉後仍會保留 */
+(function(){
+  if(window.storage) return; // Claude 預覽環境已有儲存功能
+  var PREFIX = 'outdoor-meals:';
+  var mem = {};
+  var lsOk = false;
+  try{
+    localStorage.setItem(PREFIX+'__t','1');
+    localStorage.removeItem(PREFIX+'__t');
+    lsOk = true;
+  }catch(e){}
+  window.storage = {
+    get: function(key){
+      var v = null;
+      try{ v = lsOk ? localStorage.getItem(PREFIX+key) : (key in mem ? mem[key] : null); }catch(e){ v = (key in mem ? mem[key] : null); }
+      return Promise.resolve(v === null ? null : {key:key, value:v});
+    },
+    set: function(key, value){
+      mem[key] = value;
+      try{ if(lsOk) localStorage.setItem(PREFIX+key, value); }
+      catch(e){ return Promise.resolve(null); }
+      return Promise.resolve({key:key, value:value});
+    },
+    delete: function(key){
+      delete mem[key];
+      try{ if(lsOk) localStorage.removeItem(PREFIX+key); }catch(e){}
+      return Promise.resolve({key:key, deleted:true});
+    },
+    list: function(prefix){
+      var keys = [];
+      try{
+        for(var i=0;i<localStorage.length;i++){
+          var k = localStorage.key(i);
+          if(k && k.indexOf(PREFIX+(prefix||''))===0) keys.push(k.slice(PREFIX.length));
+        }
+      }catch(e){}
+      return Promise.resolve({keys:keys});
+    }
+  };
+  // 要求瀏覽器「持久保存」，避免空間不足時被系統清掉
+  try{ if(navigator.storage && navigator.storage.persist) navigator.storage.persist(); }catch(e){}
+})();
+</script>
 <script>
 const CATEGORIES = [
   {key:'米飯類', color:'#C1852B'},
@@ -881,7 +944,8 @@ const MAIN_ITEMS = [
   {key:'enter', title:'進入供餐系統', desc:'選擇區單位並登記餐點', emoji:'🍱', color:'#3B5B3E'},
   {key:'summary', title:'查看本區餐點清單', desc:'瀏覽目前已登記的所有項目', emoji:'📋', color:'#2C6E7A'},
   {key:'edit', title:'修改已登記餐點', desc:'編輯或刪除已送出的項目', emoji:'✏️', color:'#C1852B'},
-  {key:'excel', title:'匯出／分享報表', desc:'產生 Excel 報表並分享', emoji:'📊', color:'#1D6F42'}
+  {key:'excel', title:'匯出／分享報表', desc:'產生 Excel 報表並分享', emoji:'📊', color:'#1D6F42'},
+  {key:'download', title:'下載到手機', desc:'直接把 Excel 報表存到手機', emoji:'💾', color:'#5B4B8A'}
 ];
 // 八卦（易經／儒家五經之一）— 依序對應各區的圖示，取代文字
 // 每組為 [初爻(下), 中爻, 上爻]，1=陽爻(實線) 0=陰爻(斷線)
@@ -1209,6 +1273,8 @@ function renderMainList(){
       openEditView();
     }else if(item.key==='excel'){
       openExcelShareModal();
+    }else if(item.key==='download'){
+      downloadExcelToPhone();
     }
   });
 }
@@ -1334,6 +1400,31 @@ function openExcelShareModal(){
   }
   document.getElementById('excelModalArea').textContent = selectedArea;
   document.getElementById('excelShareModal').style.display = 'flex';
+}
+
+function downloadExcelToPhone(){
+  if(!selectedArea){
+    showToast('請先在上方選擇提供餐點的區單位');
+    return;
+  }
+  if(!entries.some(e=>e.area===selectedArea)){
+    showToast('目前還沒有「' + selectedArea + '」提供的餐點資料');
+    return;
+  }
+  if(typeof XLSX === 'undefined'){
+    showToast('Excel 元件載入失敗，請檢查網路連線後再試一次');
+    return;
+  }
+  const wb = buildAreaWorkbook(selectedArea);
+  if(!wb){
+    showToast('下載失敗，請稍後再試一次');
+    return;
+  }
+  const wbout = XLSX.write(wb, { bookType:'xlsx', type:'array' });
+  const filename = selectedArea + '_餐點統計_' + getTimestamp() + '.xlsx';
+  const blob = new Blob([wbout], { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  downloadBlob(blob, filename);
+  showToast('已下載「' + filename + '」，請到手機「檔案／下載」資料夾查看');
 }
 
 function closeExcelShareModal(){
@@ -2093,7 +2184,25 @@ document.getElementById('editBackBtn').addEventListener('click', showLanding);
   var backBtn = document.getElementById('fabBackBtn');
   var topBtn = document.getElementById('fabTopBtn');
   var bottomBtn = document.getElementById('fabBottomBtn');
+  var homeBtn = document.getElementById('fabHomeBtn');
   var isOpen = false;
+
+  function bottomTargetY(){
+    var target = document.querySelector('.footer-note');
+    if(target){
+      var rect = target.getBoundingClientRect();
+      return Math.max(window.scrollY + rect.bottom - window.innerHeight, 0);
+    }
+    return Math.max(document.body.scrollHeight - window.innerHeight, 0);
+  }
+  /* 在頂端 → 「回到頂端」不可按；在底端 → 「去到底端」不可按 */
+  function updateScrollButtons(){
+    var y = window.scrollY || window.pageYOffset || 0;
+    topBtn.disabled = y <= 2;
+    bottomBtn.disabled = y >= bottomTargetY() - 2;
+  }
+  window.addEventListener('scroll', updateScrollButtons, {passive:true});
+  window.addEventListener('resize', updateScrollButtons);
 
   function closeMenu(){
     isOpen = false;
@@ -2104,9 +2213,13 @@ document.getElementById('editBackBtn').addEventListener('click', showLanding);
     isOpen = true;
     menu.classList.add('open');
     mainBtn.textContent = '📁';
+    updateScrollButtons();
   }
 
   window.updateFabVisibility = function(){
+    homeBtn.style.display = (currentView === 'landing') ? 'none' : ''; /* 區選單頁的「返回」本身就是回主畫面 */
+    setTimeout(updateScrollButtons, 0);
+    setTimeout(updateScrollButtons, 300);
     if(currentView === 'main'){
       container.style.display = 'none';
       closeMenu();
@@ -2129,20 +2242,14 @@ document.getElementById('editBackBtn').addEventListener('click', showLanding);
     }
   };
 
+  homeBtn.addEventListener('click', function(){ closeMenu(); showMain(); });
   topBtn.addEventListener('click', function(){
     closeMenu();
     window.scrollTo({top:0, behavior:'smooth'});
   });
   bottomBtn.addEventListener('click', function(){
     closeMenu();
-    var target = document.querySelector('.footer-note');
-    if(target){
-      var rect = target.getBoundingClientRect();
-      var targetY = window.scrollY + rect.bottom - window.innerHeight;
-      window.scrollTo({top:Math.max(targetY, 0), behavior:'smooth'});
-    } else {
-      window.scrollTo({top:document.body.scrollHeight, behavior:'smooth'});
-    }
+    window.scrollTo({top:bottomTargetY(), behavior:'smooth'});
   });
 
   /* 拖曳移動 + 點擊切換選單（以位移量分辨拖曳或點擊） */

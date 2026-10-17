@@ -1,6 +1,22 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
+<script>
+// ── 排程品項顯示順序（回報文字、每日摘要共用）──
+// G腿／粽子／油飯／水餃 → 三角圓 → 醬料類、炒菇、炒香菇絲 → 餛飩料 → 粉類 → 餛飩／麻油猴菇／補湯
+window._SCHED_PROD_ORDER = ['gleg','gleg_spicy','zongzi_d','zongzi_c','oily_rice','monkey_rice',
+  'dumplings_xc','dumplings_hq','dumplings_hq_fill',
+  'triangle','fry_triangle','fry_triangle_fill',
+  'minced','minced_chili','white_sauce','red_sauce','green_sauce','mushroom_sauce','black_pepper_sauce','rice_sauce','sesame_ginger','fried_mushr','mushr_shred',
+  'wonton_fill',
+  'curry','pepper_salt','dump_powder',
+  'wonton','sesame_monkey','soup_refill'];
+window.schedProdRank = function(prod) {
+  var i = window._SCHED_PROD_ORDER.indexOf(prod);
+  return i < 0 ? window._SCHED_PROD_ORDER.indexOf('dump_powder') + 0.5 : i; // 未列名品項：粉類之後、最後一組之前
+};
+
+</script>
   <link rel="manifest" href="der-life-manifest.json">
 
 <meta charset="UTF-8">
@@ -45,7 +61,7 @@
 })();
 </script>
 <!-- SheetJS for Excel 匯入 -->
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;600;700&family=Noto+Sans+TC:wght@300;400;500;700&display=swap');
 
@@ -370,6 +386,24 @@
   .per-unit-table { width: auto !important; }
   .per-unit-table td, .per-unit-table th { white-space: nowrap; width: 1%; padding: 5px 8px 5px 0; }
   .per-unit-table td:first-child, .per-unit-table th:first-child { padding-right: 0; }
+
+
+  /* 需求計算結果：窄螢幕可完整顯示／可橫向捲動 */
+  .calc-scroll { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .calc-table td.num, .calc-table th.num { text-align: left; }
+  .calc-table td:first-child, .calc-table th:first-child { min-width: 5.5em; white-space: normal; word-break: break-all; }
+  @media (max-width: 600px) {
+    .calc-table { font-size: 12px; }
+    .calc-table th { font-size: 11px; letter-spacing: 0; padding: 5px 3px; white-space: normal; line-height: 1.25; vertical-align: bottom; }
+    .calc-table td { padding: 5px 3px; }
+    .calc-table td.num, .calc-table th.num { width: auto; }
+    .calc-table td:first-child { min-width: 4.5em; }
+    .calc-table .badge { padding: 2px 5px; font-size: 11px; white-space: nowrap; }
+  }
+
+  .irow:has(> .home-est) { flex-wrap: wrap; row-gap: 2px; }
+  .home-est { flex: 1 0 100%; text-align: left; font-size: 13px; color: var(--green); white-space: nowrap; margin: 0 0 2px; }
+  .home-est b { font-size: 15px; }
 
   /* BUTTONS */
   .btn {
@@ -1624,14 +1658,15 @@ body{font-family:'Noto Sans TC',sans-serif;color:var(--ink);
 
       <div class="input-block" style="--label-w:9.5em">
         <div class="input-block-title">🌿 主要原料</div>
-        <div class="irow"><label>香菇頭</label><div class="ifield"><input type="number" id="home_inv_mushrHead" min="0" step="0.1" oninput="window.homeSyncStock('home_inv_mushrHead','nw_inv_mushrHead')"><span class="unit">斤</span></div></div>
-        <div class="irow"><label>碎肉</label><div class="ifield"><input type="number" id="home_inv_mince" min="0" step="0.1" oninput="window.homeSyncStock('home_inv_mince','nw_inv_mince')"><span class="unit">斤</span></div></div>
-        <div class="irow"><label>菜脯</label><div class="ifield"><input type="number" id="home_inv_radish" min="0" step="0.1" oninput="window.homeSyncStock('home_inv_radish','nw_inv_radish')"><span class="unit">斤</span></div></div>
+        <div class="irow"><label>香菇頭</label><div class="ifield"><input type="number" id="home_inv_mushrHead" min="0" step="0.1" oninput="window.homeSyncStock('home_inv_mushrHead','nw_inv_mushrHead')"><span class="unit">斤</span></div><span class="home-est">下週預計剩 <b id="home_est_mushrHead">—</b> 斤</span></div>
+        <div class="irow"><label>碎肉</label><div class="ifield"><input type="number" id="home_inv_mince" min="0" step="0.1" oninput="window.homeSyncStock('home_inv_mince','nw_inv_mince')"><span class="unit">斤</span></div><span class="home-est">下週預計剩 <b id="home_est_mince">—</b> 斤</span></div>
+        <div class="irow" id="home_mince_bonus_row" style="border-bottom:none;padding-top:0;display:none"><label style="display:flex;align-items:center;gap:8px;cursor:pointer;width:100%;font-size:14px;color:var(--gold)"><input type="checkbox" id="home_mince_dumpling_bonus" style="width:20px;height:20px;flex:0 0 auto;accent-color:var(--gold)" onchange="window.setMinceDumplingBonus(this.checked)"><span>下週有做香椿水餃（碎肉會多 56斤）</span></label></div>
+        <div class="irow"><label>菜脯</label><div class="ifield"><input type="number" id="home_inv_radish" min="0" step="0.1" oninput="window.homeSyncStock('home_inv_radish','nw_inv_radish')"><span class="unit">斤</span></div><span class="home-est">下週預計剩 <b id="home_est_radish">—</b> 斤</span></div>
       </div>
 
       <div class="input-block" style="--label-w:9.5em">
         <div class="input-block-title">🔺 三角圓庫存</div>
-        <div class="irow"><label>實際剩料（盆）</label><div class="ifield"><input type="number" id="home_inv_tri_left" min="0" oninput="window.homeSyncStock('home_inv_tri_left','nw_inv_tri_left')"><span class="unit">盆</span></div></div>
+        <div class="irow"><label>實際剩料（盆）</label><div class="ifield"><input type="number" id="home_inv_tri_left" min="0" oninput="window.homeSyncStock('home_inv_tri_left','nw_inv_tri_left')"><span class="unit">盆</span></div><span class="home-est">預計剩料 <b id="home_est_tri">—</b> 盆</span></div>
       </div>
 
       <div class="input-block" style="--label-w:9.5em">
@@ -3215,7 +3250,7 @@ body{font-family:'Noto Sans TC',sans-serif;color:var(--ink);
 <tr><td class="order-item">紅麴醬</td><td class="order-qty"><input type="number" min="0" class="order-input" oninput="orderAutoSave()"></td><td class="order-unit">箱</td><td class="order-note"><input type="text" class="order-note-input" oninput="orderAutoSave()"></td></tr>
 <tr class="order-subheader"><td colspan="4">勝展</td></tr>
 <tr><td class="order-item">牛頭牌沙茶醬</td><td class="order-qty"><input type="number" min="0" class="order-input" oninput="orderAutoSave()"></td><td class="order-unit">箱</td><td class="order-note"><input type="text" class="order-note-input" oninput="orderAutoSave()"></td></tr>
-<tr><td class="order-item">愛之味沙茶醬</td><td class="order-qty"><input type="number" min="0" class="order-input" oninput="orderAutoSave()"></td><td class="order-unit">箱</td><td class="order-note"><input type="text" class="order-note-input" oninput="orderAutoSave()"></td></tr>
+<tr><td class="order-item">愛之味沙茶醬</td><td class="order-qty"><input type="number" min="0" class="order-input" oninput="orderAutoSave()"></td><td class="order-unit">桶</td><td class="order-note"><input type="text" class="order-note-input" oninput="orderAutoSave()"></td></tr>
 <tr class="order-subheader"><td colspan="4">裕軒</td></tr>
 <tr><td class="order-item">番茄糊</td><td class="order-qty"><input type="number" min="0" class="order-input" oninput="orderAutoSave()"></td><td class="order-unit">箱</td><td class="order-note"><input type="text" class="order-note-input" oninput="orderAutoSave()"></td></tr>
 <tr><td class="order-item">小磨坊紅辣椒粉T</td><td class="order-qty"><input type="number" min="0" class="order-input" oninput="orderAutoSave()"></td><td class="order-unit">箱</td><td class="order-note"><input type="text" class="order-note-input" oninput="orderAutoSave()"></td></tr>
@@ -5900,18 +5935,19 @@ function recalcAll() {
     const convertH = Math.ceil(needH/93); // 需補包數
     const estRemH = convertH > 0 ? (convertH * 93 - needH) : (invH - mHeadTotal >= 0 ? invH - mHeadTotal : 0);
     const convertM = Math.ceil(needM/75);
-    const estRemM = convertM > 0 ? (convertM * 75 - needM) : (invM - mMinceTotal >= 0 ? invM - mMinceTotal : 0);
+    const minceDumplingBonus = (window._overviewSource === 'nw' && window.getMinceDumplingBonus && window.getMinceDumplingBonus()) ? 56 : 0;
+    const estRemM = (convertM > 0 ? (convertM * 75 - needM) : (invM - mMinceTotal >= 0 ? invM - mMinceTotal : 0)) + minceDumplingBonus;
     const convertR = Math.ceil(needR/15);
     const estRemR = convertR > 0 ? (convertR * 15 - needR) : (invR - mRadish >= 0 ? invR - mRadish : 0);
 
-    mc.innerHTML = `<table class="data-table"><thead><tr>
+    mc.innerHTML = `<div class="calc-scroll"><table class="data-table calc-table"><thead><tr>
       <th style="color:var(--gold2)">原料</th><th class="num" style="color:var(--gold2)">需求(斤)</th><th class="num" style="color:var(--gold2)">庫存(斤)</th><th class="num" style="color:var(--gold2)">仍需(斤)</th><th style="color:var(--gold2)">換算</th><th class="num" style="color:var(--gold2)">使用後預估剩餘量(斤)</th><th style="color:var(--gold2)">狀態</th>
     </tr></thead><tbody>
       <tr><td style="color:var(--gold)">香菇頭${detailH}</td><td class="num">${mHeadTotal}</td><td class="num">${invH}</td><td class="num">${needH}</td><td>${needH > 0 ? convertH+'袋' : '-'}</td>
         <td class="num" style="color:var(--green);font-weight:700">${estRemH}</td>
         <td><span class="badge ${needH > 0 ? 'badge-out' : 'badge-ok'}">${needH > 0 ? '需補' : '足夠'}</span></td></tr>
       <tr><td style="color:var(--gold)">碎肉${detailM}</td><td class="num">${mMinceTotal}</td><td class="num">${invM}</td><td class="num">${needM}</td><td>${needM > 0 ? convertM+'袋' : '-'}</td>
-        <td class="num" style="color:var(--green);font-weight:700">${estRemM}</td>
+        <td class="num" style="color:var(--green);font-weight:700">${estRemM}${minceDumplingBonus ? '<div style="font-size:10px;color:var(--gold);font-weight:400">含水餃+56</div>' : ''}</td>
         <td><span class="badge ${needM > 0 ? 'badge-out' : 'badge-ok'}">${needM > 0 ? '需補' : '足夠'}</span></td></tr>
       <tr><td style="color:var(--gold)">菜脯<div style="font-size:10px;color:var(--ink3);font-weight:400">三角圓需炒${triCookPotsM}鍋×10 + 香椿水餃${q.dumpXC}鍋×3 + 下禮拜先備${q.triNext}鍋×10</div></td><td class="num">${mRadish}</td><td class="num">${invR}</td><td class="num">${needR}</td><td>${needR > 0 ? convertR+'箱' : '-'}</td>
         <td class="num" style="color:var(--green);font-weight:700">${estRemR}</td>
@@ -5919,7 +5955,7 @@ function recalcAll() {
       ${zCaipoJin > 0 ? `<tr><td style="color:var(--gold)">粽子菜脯<div style="font-size:10px;color:var(--ink3);font-weight:400">${totalZi > 0 ? '菜脯料菜脯' : '油飯需炒菜脯料菜脯'}${zCaipoLiang}兩÷16÷15=${zCaipoBox}箱</div></td><td class="num">${zCaipoJin}斤</td><td class="num">${invZR}</td><td class="num">${Math.max(0,zCaipoBox - Math.ceil(invZR/15))}箱</td><td>${zCaipoBox}箱</td>
         <td class="num" style="color:var(--green);font-weight:700">${zCaipoBox > Math.ceil(invZR/15) ? Math.ceil(Math.max(0,zCaipoBox*15 - zCaipoJin)) : Math.ceil(invZR - zCaipoJin)}</td>
         <td><span class="badge ${zCaipoBox > Math.ceil(invZR/15) ? 'badge-out' : 'badge-ok'}">${zCaipoBox > Math.ceil(invZR/15) ? '需補' : '足夠'}</span></td></tr>` : ''}
-    </tbody></table>`;
+    </tbody></table></div>`;
 
     // 更新主要原料預計剩餘顯示
     var _elRemH = document.getElementById('est_rem_mushrHead');
@@ -9344,7 +9380,7 @@ function recalcOilySeasoning() {
       function redNums(s) {
         return String(s).replace(/(\d+(?:\.\d+)?)/g, '<span style="color:var(--red)">$1</span>');
       }
-      var summaryParts = normalItems.map(function(it){
+      var summaryRanked = normalItems.map(function(it){
         var p = PRODUCTS.find(function(pp){return pp.id===it.prod;});
         var pQty = (it.plannedQty != null) ? it.plannedQty : it.qty;
         var aQty = (it.actualQty  != null) ? it.actualQty  : it.qty;
@@ -9360,16 +9396,20 @@ function recalcOilySeasoning() {
         }
         return redNums(emoji+(p?p.label:it.prod) + ' ' + aQty + (p?p.unit:'') + cn + spicyStrBuild);
       });
+      summaryRanked = summaryRanked.map(function(str, i){ return { r: window.schedProdRank(normalItems[i].prod), s: str }; });
       var sjyLabel = (typeof getSanJiaoYuanLabel === 'function') ? getSanJiaoYuanLabel(dateKey) : '';
-      if (sjyLabel) summaryParts.push(redNums(sjyLabel));
+      if (sjyLabel) summaryRanked.push({ r: window.schedProdRank('triangle') + 0.4, s: redNums(sjyLabel) });
       var zprLabel = (typeof getZongziPrepLabel === 'function') ? getZongziPrepLabel(dateKey) : '';
-      if (zprLabel) summaryParts.push(redNums(zprLabel));
+      if (zprLabel) summaryRanked.push({ r: window.schedProdRank('zongzi_c') + 0.4, s: redNums(zprLabel) });
       var glegSauceLabel = (typeof getGlegSaucePrepLabel === 'function') ? getGlegSaucePrepLabel(dateKey) : '';
-      if (glegSauceLabel) summaryParts.push(redNums(glegSauceLabel));
+      if (glegSauceLabel) summaryRanked.push({ r: window.schedProdRank('soup_refill') + 0.5, s: redNums(glegSauceLabel) });
       var oilyPrepLabel = (typeof getOilyRicePrepLabel === 'function') ? getOilyRicePrepLabel(dateKey) : '';
-      if (oilyPrepLabel) summaryParts.push(redNums(oilyPrepLabel));
+      if (oilyPrepLabel) summaryRanked.push({ r: window.schedProdRank('monkey_rice') + 0.4, s: redNums(oilyPrepLabel) });
       var wontonSlurryLabel = (typeof getWontonSlurryPrepLabel === 'function') ? getWontonSlurryPrepLabel(dateKey) : '';
-      if (wontonSlurryLabel) summaryParts.push(redNums(wontonSlurryLabel));
+      if (wontonSlurryLabel) summaryRanked.push({ r: window.schedProdRank('wonton') + 0.4, s: redNums(wontonSlurryLabel) });
+      var summaryParts = summaryRanked.map(function(o, i){ return { o: o, i: i }; })
+        .sort(function(a, b){ return (a.o.r - b.o.r) || (a.i - b.i); })
+        .map(function(x){ return x.o.s; });
       html += summaryParts.join('、');
       html += '</span>';
     } else {
@@ -9422,37 +9462,37 @@ function recalcOilySeasoning() {
     html += '</div>';
 
     // 各品項面板佔位
-    html += '<div id="sched-zongzi-seasoning-today-' + dateKey + '"></div>';
-    html += '<div id="sched-wonton-recipe-' + dateKey + '"></div>';
     html += '<div id="sched-gleg-powder-' + dateKey + '"></div>';
-    html += '<div id="sched-gleg-sauce-prep-' + dateKey + '"></div>';
+    html += '<div id="sched-soup-refill-' + dateKey + '"></div>';
+    html += '<div id="sched-oily-prep-' + dateKey + '"></div>';
     html += '<div id="sched-dumpling-recipe-' + dateKey + '"></div>';
-    html += '<div id="sched-mushr-shred-' + dateKey + '"></div>';
-    html += '<div id="sched-fried-mushr-' + dateKey + '"></div>';
+    html += '<div id="sched-dumpling-hq-' + dateKey + '"></div>';
+    html += '<div id="sched-dumpling-hq-fill-' + dateKey + '"></div>';
+    html += '<div id="sched-triangle-fill-' + dateKey + '"></div>';
     html += '<div id="sched-white-sauce-' + dateKey + '"></div>';
     html += '<div id="sched-green-sauce-' + dateKey + '"></div>';
-    html += '<div id="sched-soup-refill-' + dateKey + '"></div>';
     html += '<div id="sched-rice-sauce-' + dateKey + '"></div>';
     html += '<div id="sched-sesame-ginger-' + dateKey + '"></div>';
-    html += '<div id="sched-curry-' + dateKey + '"></div>';
-    html += '<div id="sched-pepper-' + dateKey + '"></div>';
-    html += '<div id="sched-zongzi-drysea-' + dateKey + '"></div>';
-    html += '<div id="sched-oily-redshred-' + dateKey + '"></div>';
-    html += '<div id="sched-oily-prep-' + dateKey + '"></div>';
-    html += '<div id="sched-zongzi-seasoning-' + dateKey + '"></div>';
-    html += '<div id="sched-zongzi-drysea-manual-' + dateKey + '"></div>';
-    html += '<div id="sched-sesame-monkey-' + dateKey + '"></div>';
-    html += '<div id="sched-dump-powder-' + dateKey + '"></div>';
-    html += '<div id="sched-triangle-fill-' + dateKey + '"></div>';
     html += '<div id="sched-mushroom-sauce-' + dateKey + '"></div>';
     html += '<div id="sched-black-pepper-sauce-' + dateKey + '"></div>';
     html += '<div id="sched-red-sauce-recipe-' + dateKey + '"></div>';
-    html += '<div id="sched-wonton-fill-recipe-' + dateKey + '"></div>';
-    html += '<div id="sched-dumpling-hq-' + dateKey + '"></div>';
-    html += '<div id="sched-dumpling-hq-fill-' + dateKey + '"></div>';
-    html += '<div id="sched-minced-recipe-' + dateKey + '"></div>';
     html += '<div id="sched-chili-sauce-' + dateKey + '"></div>';
+    html += '<div id="sched-minced-recipe-' + dateKey + '"></div>';
     html += '<div id="sched-lotus-monkey-' + dateKey + '"></div>';
+    html += '<div id="sched-fried-mushr-' + dateKey + '"></div>';
+    html += '<div id="sched-mushr-shred-' + dateKey + '"></div>';
+    html += '<div id="sched-wonton-fill-recipe-' + dateKey + '"></div>';
+    html += '<div id="sched-curry-' + dateKey + '"></div>';
+    html += '<div id="sched-pepper-' + dateKey + '"></div>';
+    html += '<div id="sched-dump-powder-' + dateKey + '"></div>';
+    html += '<div id="sched-zongzi-seasoning-today-' + dateKey + '"></div>';
+    html += '<div id="sched-zongzi-seasoning-' + dateKey + '"></div>';
+    html += '<div id="sched-zongzi-drysea-' + dateKey + '"></div>';
+    html += '<div id="sched-zongzi-drysea-manual-' + dateKey + '"></div>';
+    html += '<div id="sched-oily-redshred-' + dateKey + '"></div>';
+    html += '<div id="sched-wonton-recipe-' + dateKey + '"></div>';
+    html += '<div id="sched-sesame-monkey-' + dateKey + '"></div>';
+    html += '<div id="sched-gleg-sauce-prep-' + dateKey + '"></div>';
 
     html += '</div>'; // sched-day-body
     html += '</div>'; // sched-day
@@ -13407,7 +13447,7 @@ function recalcOilySeasoning() {
           targetFryDay = fridayKey;
         } else {
           // 找本週最後一個有真實排程的天
-          for (var li = weekKeys.length - 1; li >= 0; li--) {
+          for (var li = Math.min(weekKeys.length, 5) - 1; li >= 0; li--) { // 只看週一~週五，週六日不算
             var lr = schedData[weekKeys[li]];
             if (lr && lr.items && lr.items.filter(function(it){
               return it.prod !== 'fry_triangle_fill' && it.prod !== 'fry_triangle';
@@ -13732,18 +13772,26 @@ function recalcOilySeasoning() {
   // ── 餛飩煮漿備料：取得下一個工作日（跳過週六日）的餛飩（包）數量 ──
   function getWontonNextWorkdayQty(dateKey) {
     schLoad();
+    function wq(dt) {
+      var k = fmtDate(dt.getFullYear(), dt.getMonth()+1, dt.getDate());
+      var r = schedData[k];
+      var q = 0;
+      if (r && r.items) r.items.forEach(function(it) { if (it.prod === 'wonton') q += parseFloat(it.qty) || 0; });
+      return q;
+    }
+    // 先看「隔天」（含週六日）：餛飩前一天一定要煮餛飩漿
+    var d1 = new Date(dateKey + 'T00:00:00');
+    d1.setDate(d1.getDate() + 1);
+    var q1 = wq(d1);
+    if (q1 > 0) return q1;
+    // 隔天沒有 → 沿用原規則：下一個工作日（跳過週六日）
     var d = new Date(dateKey + 'T00:00:00');
     for (var i = 1; i <= 7; i++) {
       d.setDate(d.getDate() + 1);
       var wd = d.getDay();
       if (wd !== 0 && wd !== 6) break;
     }
-    var nextDk = fmtDate(d.getFullYear(), d.getMonth()+1, d.getDate());
-    var rec = schedData[nextDk];
-    if (!rec || !rec.items) return 0;
-    var qty = 0;
-    rec.items.forEach(function(it) { if (it.prod === 'wonton') qty += parseFloat(it.qty) || 0; });
-    return qty;
+    return wq(d);
   }
 
   // ── 煮餛飩漿文字提示（排程摘要用）──
@@ -13751,7 +13799,7 @@ function recalcOilySeasoning() {
   function getWontonSlurryPrepLabel(dateKey) {
     var wontonQty = getWontonNextWorkdayQty(dateKey);
     if (wontonQty <= 0) return '';
-    return '🥟 煮餛飩漿（' + wontonQty + '包）';
+    return '🥟 煮餛飩漿（' + wontonQty + '包）、切香菜';
   }
 
   // ── 油飯備料文字提示（排程摘要用）──
@@ -13944,7 +13992,7 @@ function recalcOilySeasoning() {
     var nextWeekFirstHasTriPrep = weekFirstDayHasTriangle(nextWeekKeysForPrep);
     if (nextWeekFirstHasTriPrep) {
       var lastWorkDayPrep = null;
-      for (var lwi = weekKeys.length - 1; lwi >= 0; lwi--) {
+      for (var lwi = Math.min(weekKeys.length, 5) - 1; lwi >= 0; lwi--) { // 只看週一~週五，週六日不算
         var lwr = schedData[weekKeys[lwi]];
         if (lwr && lwr.items && lwr.items.filter(function(it){
           return it.prod !== 'fry_triangle_fill' && it.prod !== 'fry_triangle';
@@ -14097,6 +14145,29 @@ function recalcOilySeasoning() {
     }
     body.style.display = open ? 'none' : 'block';
     if (icon) icon.textContent = open ? '▶' : '▼';
+    // 展開某天後，畫面直接帶到該天第一張斤兩卡
+    if (!open) {
+      var _scrollToFirstCard = function() {
+        var cards = [];
+        var kids = body.querySelectorAll('[id^="sched-"]');
+        for (var i = 0; i < kids.length; i++) {
+          var c = kids[i];
+          if (c.tagName !== 'DIV' || !/^sched-[a-z-]+-\d{4}-\d{2}-\d{2}$/.test(c.id)) continue;
+          if (/^sched-(day|body|icon|items|prod|qty|note)-/.test(c.id)) continue;
+          if (!(c.textContent || '').trim()) continue;
+          Array.prototype.forEach.call(c.children, function(k) { if (k.tagName === 'DIV') cards.push(k); });
+        }
+        if (!cards.length) return;
+        // 第一張已收合就改顯示下一張，依序往後找第一張展開中的卡片；全部收合則停在第一張
+        var first = cards[0];
+        for (var j = 0; j < cards.length; j++) {
+          if (!cards[j].classList.contains('sm-collapsed')) { first = cards[j]; break; }
+        }
+        try { first.style.scrollMarginTop = '70px'; first.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+        catch (e) { first.scrollIntoView(true); }
+      };
+      setTimeout(_scrollToFirstCard, 150);
+    }
   };
 
   window.schedAddItem = function(dateKey) {
@@ -14462,17 +14533,37 @@ function recalcOilySeasoning() {
 
     // 排程頁面單一天會用到的所有面板 id 前綴（對照 buildDayHtml 裡的佔位 div）
     var PANEL_PREFIXES = [
-      'sched-zongzi-seasoning-today-', 'sched-wonton-recipe-', 'sched-gleg-powder-',
-      'sched-gleg-sauce-prep-', 'sched-dumpling-recipe-', 'sched-mushr-shred-',
-      'sched-fried-mushr-', 'sched-white-sauce-', 'sched-green-sauce-',
-      'sched-soup-refill-', 'sched-rice-sauce-', 'sched-sesame-ginger-',
-      'sched-curry-', 'sched-pepper-', 'sched-zongzi-drysea-',
-      'sched-oily-redshred-', 'sched-oily-prep-', 'sched-zongzi-seasoning-',
-      'sched-zongzi-drysea-manual-', 'sched-sesame-monkey-', 'sched-dump-powder-',
-      'sched-triangle-fill-', 'sched-mushroom-sauce-', 'sched-black-pepper-sauce-',
-      'sched-red-sauce-recipe-', 'sched-wonton-fill-recipe-', 'sched-dumpling-hq-',
-      'sched-dumpling-hq-fill-', 'sched-minced-recipe-', 'sched-chili-sauce-',
-      'sched-lotus-monkey-'
+      'sched-gleg-powder-',
+      'sched-soup-refill-',
+      'sched-oily-prep-',
+      'sched-dumpling-recipe-',
+      'sched-dumpling-hq-',
+      'sched-dumpling-hq-fill-',
+      'sched-triangle-fill-',
+      'sched-white-sauce-',
+      'sched-green-sauce-',
+      'sched-rice-sauce-',
+      'sched-sesame-ginger-',
+      'sched-mushroom-sauce-',
+      'sched-black-pepper-sauce-',
+      'sched-red-sauce-recipe-',
+      'sched-chili-sauce-',
+      'sched-minced-recipe-',
+      'sched-lotus-monkey-',
+      'sched-fried-mushr-',
+      'sched-mushr-shred-',
+      'sched-wonton-fill-recipe-',
+      'sched-curry-',
+      'sched-pepper-',
+      'sched-dump-powder-',
+      'sched-zongzi-seasoning-today-',
+      'sched-zongzi-seasoning-',
+      'sched-zongzi-drysea-',
+      'sched-zongzi-drysea-manual-',
+      'sched-oily-redshred-',
+      'sched-wonton-recipe-',
+      'sched-sesame-monkey-',
+      'sched-gleg-sauce-prep-'
     ];
 
     var tempHost = document.createElement('div');
@@ -18065,7 +18156,12 @@ function buildLineMsg(dateKey) {
   try { sd = JSON.parse(localStorage.getItem(window._SCHD_KEY || 'schedule_v2') || '{}'); } catch(e){}
   window._schedData = sd;
   var rec = sd[dateKey] || { items: [], note: '' };
-  var items = rec.items || [];
+  var items = (rec.items || []).slice();
+  // 回報文字的品項顯示順序：G腿／粽子／油飯／水餃 → 三角圓 → 醬料類、炒菇、炒香菇絲 → 餛飩料 → 粉類 → 餛飩／麻油猴菇／補湯
+  var _lineRank = window.schedProdRank;
+  items = items.map(function(it, idx) { return { it: it, idx: idx }; })
+    .sort(function(a, b) { return (_lineRank(a.it.prod) - _lineRank(b.it.prod)) || (a.idx - b.idx); })
+    .map(function(o) { return o.it; });
   var parts = dateKey.split('-');
   var m = parseInt(parts[1], 10);
   var d = parseInt(parts[2], 10);
@@ -20498,6 +20594,112 @@ function debugFixNow() {
   var HOME_ZONGZI_SRC_IDS = ['inv_gLegFill', 'inv_mushroom', 'inv_redMeat', 'inv_whiteMeat', 'inv_corner', 'inv_chestnut'];
   var HOME_ZONGZI_NW_IDS = ['nw_inv_gLegFill', 'nw_inv_mushroom', 'nw_inv_redMeat', 'nw_inv_whiteMeat', 'nw_inv_corner', 'nw_inv_chestnut'];
 
+  // ── 碎肉：下週有做水餃 → 下週使用後預估剩餘量 +56 斤 ──
+  window.nwHasDumplings = function() {
+    return ['nw_q_dumplings_xc'].some(function(id) {
+      var el = document.getElementById(id);
+      return el && parseFloat(el.value) > 0;
+    });
+  };
+  // ── 庫存視窗：同步顯示各項目預計剩料（鏡射下週頁面的預計剩數值）──
+  var HOME_EST_PAIRS = [
+    ['home_est_mushrHead', 'nw_est_rem_mushrHead'],
+    ['home_est_mince', 'nw_est_rem_mince'],
+    ['home_est_radish', 'nw_est_rem_radish'],
+    ['home_est_tri', 'tri_est_left_display']
+  ];
+  window._homeRecalcRaw = null;
+  window._homeEstBusy = false;
+  function _homeMirrorEst() {
+    HOME_EST_PAIRS.forEach(function(p) {
+      var d = document.getElementById(p[0]), o = document.getElementById(p[1]);
+      if (!d || !o) return;
+      d.textContent = o.textContent;
+      d.style.color = (parseFloat(o.textContent) < 0) ? 'var(--red)' : '';
+    });
+  }
+  window.homeRefreshEst = function() {
+    if (window._homeEstBusy) return;
+    var modal = document.getElementById('modal-stock-input');
+    var visible = !!modal && modal.getClientRects().length > 0 && getComputedStyle(modal).visibility !== 'hidden' && getComputedStyle(modal).display !== 'none' && parseFloat(getComputedStyle(modal).opacity) > 0;
+    var raw = window._homeRecalcRaw;
+    // 視窗開著：不論目前是本週/下週模式，一律以「下週」基準重新計算，確保數字永遠是下週預計剩料
+    if (visible && raw) {
+      window._homeEstBusy = true;
+      var prev = window._overviewSource || 'cur';
+      try {
+        window._overviewSource = 'cur'; raw();   // 先建立本週預計剩快照
+        window._overviewSource = 'nw';  raw();   // 再以下週計算
+        _homeMirrorEst();
+      } catch(e) {
+        try { console.error('homeRefreshEst', e); } catch(_) {}
+      } finally {
+        if (prev !== 'nw') { window._overviewSource = prev; try { raw(); } catch(e) {} }
+        window._overviewSource = prev;
+        window._homeEstBusy = false;
+      }
+      return;
+    }
+    _homeMirrorEst();
+  };
+  setTimeout(function() {
+    try {
+      var mo = new MutationObserver(function() { var m = document.getElementById('modal-stock-input'); if (!window._homeEstBusy && !(m && m.getClientRects().length > 0)) _homeMirrorEst(); });
+      HOME_EST_PAIRS.forEach(function(p) {
+        var o = document.getElementById(p[1]);
+        if (o) mo.observe(o, { childList: true, characterData: true, subtree: true });
+      });
+    } catch(e) {}
+    window.homeRefreshEst();
+    // 每次重新計算後、以及視窗內任何輸入變動後，立即更新預計剩料
+    try {
+      if (typeof window.recalcAll === 'function' && !window.recalcAll._homeWrapped) {
+        var _orig = window.recalcAll;
+        window._homeRecalcRaw = _orig;
+        window.recalcAll = function() {
+          var r = _orig.apply(this, arguments);
+          if (!window._homeEstBusy) { try { window.homeRefreshEst(); } catch(e) {} }
+          return r;
+        };
+        window.recalcAll._homeWrapped = true;
+      }
+    } catch(e) {}
+    var _modal = document.getElementById('modal-stock-input');
+    if (_modal) {
+      var _t = null;
+      var _live = function() {
+        clearTimeout(_t);
+        _t = setTimeout(function() {
+          try { if (typeof window.recalcAll === 'function') window.recalcAll(); } catch(e) {}
+          window.homeRefreshEst();
+        }, 60);
+      };
+      _modal.addEventListener('input', _live, true);
+      _modal.addEventListener('change', _live, true);
+    }
+  }, 0);
+
+  window.getMinceDumplingBonus = function() {
+    if (!window.nwHasDumplings()) return false;
+    try { return localStorage.getItem('mince_dumpling_bonus') === '1'; } catch(e) { return false; }
+  };
+  window.setMinceDumplingBonus = function(on) {
+    try { localStorage.setItem('mince_dumpling_bonus', on ? '1' : '0'); } catch(e) {}
+    var cb = document.getElementById('home_mince_dumpling_bonus');
+    if (cb) cb.checked = !!on;
+    // 立即反映在視窗的碎肉預計剩（先即時 ±56，再由完整重算校正為精確值）
+    try {
+      var _d = document.getElementById('home_est_mince');
+      var _wasOn = window._homeBonusShown === true;
+      if (_d && !isNaN(parseFloat(_d.textContent)) && _wasOn !== !!on) {
+        _d.textContent = Math.round((parseFloat(_d.textContent) + (on ? 56 : -56)) * 10) / 10;
+      }
+      window._homeBonusShown = !!on;
+    } catch(e) {}
+    if (typeof recalcAll === 'function') recalcAll();
+    if (window.homeRefreshEst) window.homeRefreshEst();
+  };
+
   // ── 輸入庫存剩料：開啟前先將目前數值帶入主畫面欄位；並依「今日排程」決定是否顯示油飯／粽子料庫存 ──
   window.openHomeStockModal = function() {
     var pairs = [
@@ -20552,7 +20754,14 @@ function debugFixNow() {
       });
     }
 
+    if (window.homeRefreshEst) window.homeRefreshEst();
+    var _bcb = document.getElementById('home_mince_dumpling_bonus');
+    if (_bcb) _bcb.checked = window.getMinceDumplingBonus();
+    window._homeBonusShown = !!(_bcb && _bcb.checked);
+    var _brow = document.getElementById('home_mince_bonus_row');
+    if (_brow) _brow.style.display = window.nwHasDumplings() ? '' : 'none';
     window.dlOpenModal('modal-stock-input');
+    setTimeout(function() { if (window.homeRefreshEst) window.homeRefreshEst(); }, 50);
   };
 
   // ── 輸入庫存剩料「完成」：主要原料／三角圓庫存／餛飩料庫存一律標記為已盤點；
@@ -21021,6 +21230,84 @@ function debugFixNow() {
   }
   if (document.readyState === 'complete') setTimeout(apply, 300);
   else window.addEventListener('load', function(){ setTimeout(apply, 300); });
+})();
+</script>
+<style>
+  .sm-fold-btn{position:absolute;top:8px;right:8px;width:30px;height:30px;border-radius:50%;border:1px solid rgba(0,0,0,.15);background:rgba(255,255,255,.85);font-size:15px;line-height:1;padding:0;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:2;-webkit-tap-highlight-color:transparent}
+  .sm-fold-btn:active{transform:scale(.92)}
+  .sm-foldable{position:relative}
+  .sm-fold-head{padding-right:40px!important}
+  .sm-collapsed > :not(.sm-fold-head):not(.sm-fold-btn){display:none!important}
+  .sm-collapsed > .sm-fold-head{margin-bottom:0!important}
+</style>
+<script>
+/* 斤兩區塊收合功能：右上角 🔼(展開中，按下收合) / 🔽(已收合，按下展開)；收合狀態會記住 */
+(function(){
+  var PREFIX='fold_';
+  function store(k,v){try{if(v===undefined)return localStorage.getItem(PREFIX+k);if(v)localStorage.setItem(PREFIX+k,'1');else localStorage.removeItem(PREFIX+k);}catch(e){return null;}}
+  function keyOf(t){return (t.textContent||'').replace(/\s+/g,' ').trim().split(/[（(]/)[0].trim();}
+  function attach(box,head){
+    if(!box||!head||box.dataset.foldInit)return;
+    var key=keyOf(head); if(!key)return;
+    box.dataset.foldInit='1';
+    box.classList.add('sm-foldable');
+    head.classList.add('sm-fold-head');
+    var btn=document.createElement('button');
+    btn.type='button'; btn.className='sm-fold-btn';
+    function paint(){
+      var c=box.classList.contains('sm-collapsed');
+      btn.textContent=c?'\uD83D\uDD3D':'\uD83D\uDD3C';
+      btn.setAttribute('aria-label',c?'展開':'收合');
+      btn.setAttribute('aria-expanded',c?'false':'true');
+    }
+    if(store(key)==='1')box.classList.add('sm-collapsed');
+    btn.addEventListener('click',function(e){
+      e.stopPropagation();
+      box.classList.toggle('sm-collapsed');
+      store(key,box.classList.contains('sm-collapsed'));
+      paint();
+    });
+    paint();
+    box.appendChild(btn);
+  }
+  function enhance(){
+    // 動態產生的斤兩面板（排程頁等）：外框 border-radius:8px;padding:12px，第一個子元素為標題
+    document.querySelectorAll('div[style*="border-radius:8px"][style*="padding:12px"]').forEach(function(box){
+      var head=box.firstElementChild;
+      if(!head||box.dataset.foldInit)return;
+      var st=head.getAttribute('style')||'';
+      if(st.indexOf('font-weight:700')<0||st.indexOf('letter-spacing:1px')<0)return;
+      if(!/斤兩|配方/.test(head.textContent))return;
+      attach(box,head);
+    });
+    // 排程頁各日期的面板容器（sched-xxx-YYYY-MM-DD）與「排程製作斤兩」彈窗內容：每一張卡片都可收合
+    var containers=[];
+    document.querySelectorAll('[id^="sched-"]').forEach(function(c){
+      if(/^sched-[a-z-]+-\d{4}-\d{2}-\d{2}$/.test(c.id)&&!/^sched-(day|body|icon|items|prod|qty|note)-/.test(c.id)&&c.tagName==='DIV')containers.push(c);
+    });
+    var dw=document.getElementById('home-daily-weight-body');
+    if(dw)Array.prototype.forEach.call(dw.children,function(c){containers.push(c);});
+    containers.forEach(function(c){
+      Array.prototype.forEach.call(c.children,function(box){
+        if(box.dataset.foldInit||box.tagName!=='DIV')return;
+        var head=box.firstElementChild;
+        if(!head||!(head.textContent||'').trim())return;
+        attach(box,head);
+      });
+    });
+    // 靜態卡片：標題含「斤兩／配方」
+    document.querySelectorAll('.card > .card-title:first-child').forEach(function(head){
+      if(!/斤兩|配方/.test(head.textContent))return;
+      attach(head.parentElement,head);
+    });
+  }
+  var raf=0;
+  function schedule(){if(raf)return;raf=requestAnimationFrame(function(){raf=0;try{enhance();}catch(e){}});}
+  function start(){
+    enhance();
+    try{new MutationObserver(schedule).observe(document.body,{childList:true,subtree:true});}catch(e){}
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start);else start();
 })();
 </script>
 </body>
