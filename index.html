@@ -306,12 +306,20 @@ const WRITERS = [
 
   // 公司排程系統：備份只含當月＋下月，因此按日期合併，不會清掉其他月份
   { appId:'gs', detect: p => p.type === 'der-life-full-monthly-backup',
-    count: p => `排程 ${keysN(p.schedule)} 天、盤點欄位 ${keysN(p.inventory)} 個、叫貨 ${keysN(p.orderSched)} 天（${p.year}年${p.month}月起）`,
+    count: p => `排程 ${keysN(p.schedule)} 天、盤點欄位 ${keysN(p.inventory)} 個、完整設定 ${keysN(p.allStorage)} 項、叫貨 ${keysN(p.orderSched)} 天（${p.year}年${p.month}月起）`,
     apply: (p, io) => {
       io.merge('schedule_v2', p.schedule || {});
       io.merge('order_sched_v1', p.orderSched || {});
       io.merge('order_arrival_v1', p.orderArrival || {});
       Object.keys(p.inventory || {}).forEach(id => io.set('inp_' + id, String(p.inventory[id])));
+      // 盤點已盤點標記／扣除標記
+      Object.keys(p.inventoryStorage || {}).forEach(k => { if (typeof p.inventoryStorage[k] === 'string') io.set(k, p.inventoryStorage[k]); });
+      // 完整備份：其餘所有設定（製作數量、勾選狀態等）一併寫入；排程／叫貨已按日期合併，不覆蓋
+      const SKIP = ['schedule_v2', 'order_sched_v1', 'order_arrival_v1', '__test__'];
+      Object.keys(p.allStorage || {}).forEach(k => {
+        if (SKIP.indexOf(k) >= 0 || k.indexOf('schedule_v2_backup') === 0 || k.indexOf('emb_applied_') === 0) return;
+        if (typeof p.allStorage[k] === 'string') io.set(k, p.allStorage[k]);
+      });
     } },
 ];
 
