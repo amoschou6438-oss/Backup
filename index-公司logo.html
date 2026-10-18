@@ -9396,7 +9396,7 @@ function recalcOilySeasoning() {
         }
         return redNums(emoji+(p?p.label:it.prod) + ' ' + aQty + (p?p.unit:'') + cn + spicyStrBuild);
       });
-      summaryRanked = summaryRanked.map(function(str, i){ return { r: window.schedProdRank(normalItems[i].prod), s: str }; });
+      summaryRanked = summaryRanked.map(function(str, i){ return { r: (normalItems[i].prod === 'egg_crepe') ? 9999 : window.schedProdRank(normalItems[i].prod), s: str }; }); // 蛋餅皮固定顯示在最後
       var sjyLabel = (typeof getSanJiaoYuanLabel === 'function') ? getSanJiaoYuanLabel(dateKey) : '';
       if (sjyLabel) summaryRanked.push({ r: window.schedProdRank('triangle') + 0.4, s: redNums(sjyLabel) });
       var zprLabel = (typeof getZongziPrepLabel === 'function') ? getZongziPrepLabel(dateKey) : '';
@@ -13041,6 +13041,7 @@ function recalcOilySeasoning() {
           egg_crepe:          '🥚',
           dump_powder:        '🥟',
         };
+        normItems2 = normItems2.filter(function(it){ return it.prod !== 'egg_crepe'; }).concat(normItems2.filter(function(it){ return it.prod === 'egg_crepe'; })); // 蛋餅皮排最後
         var parts2 = normItems2.map(function(it){
           var p = PRODUCTS.find(function(pp){return pp.id===it.prod;});
           var pQty2 = (it.plannedQty != null) ? it.plannedQty : it.qty;
@@ -13071,6 +13072,7 @@ function recalcOilySeasoning() {
         var oilyPrepLabel2 = (typeof getOilyRicePrepLabel === 'function') ? getOilyRicePrepLabel(dateKey) : '';
         if (oilyPrepLabel2) parts2.push(oilyPrepLabel2);
         // 補湯備料提示（已改為在隔天面板顯示斤兩，summary 不再重複顯示）
+        (function(){ var ei = normItems2.findIndex(function(it){return it.prod==='egg_crepe';}); if (ei >= 0 && ei < parts2.length) { var ep = parts2.splice(ei,1)[0]; parts2.push(ep); } })(); // 蛋餅皮文字放最後
         sum.textContent = parts2.join('、');
         header.querySelector('.sched-day-header').insertBefore(sum, icon);
         // 自動縮小摘要字體
