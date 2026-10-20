@@ -15,6 +15,33 @@ window.schedProdRank = function(prod) {
   var i = window._SCHED_PROD_ORDER.indexOf(prod);
   return i < 0 ? window._SCHED_PROD_ORDER.indexOf('dump_powder') + 0.5 : i; // 未列名品項：粉類之後、最後一組之前
 };
+// 素肉燥（辣椒醬用）卡片：切換「0.3鍋」與「原斤兩（1鍋）」
+window.mincedCardView = function(btn, mode) {
+  var card = btn.closest('[data-minced-card]');
+  if (!card) return;
+  card.querySelectorAll('[data-mview]').forEach(function(d) { d.style.display = (d.getAttribute('data-mview') === mode) ? '' : 'none'; });
+  card.querySelectorAll('[data-mview-title]').forEach(function(d) { d.style.display = (d.getAttribute('data-mview-title') === mode) ? '' : 'none'; });
+  card.querySelectorAll('[data-mview-btn]').forEach(function(b) {
+    var on = b.getAttribute('data-mview-btn') === mode;
+    b.style.background = on ? '#bf360c' : 'transparent';
+    b.style.color = on ? '#fff' : '#bf360c';
+  });
+};
+// 以「斤」為單位且有小數時，改以「斤＋兩」顯示（1斤＝16兩）；其他情況維持「數字 單位」
+window.fmtJinLiang = function(val, unit) {
+  var n = parseFloat(val);
+  if (unit === '斤' && isFinite(n) && /^\s*\d+(\.\d+)?\s*$/.test(String(val)) && Math.abs(n - Math.round(n)) > 1e-9) {
+    var liang = Math.round(n * 16 * 10) / 10;
+    var j = Math.floor(liang / 16);
+    var l = Math.round((liang - j * 16) * 10) / 10;
+    if (j > 0 && l % 1 !== 0) { l = Math.ceil(l); if (l >= 16) { j += 1; l = 0; } } // 有斤有兩且兩有小數 → 兩無條件進位
+    var out = '';
+    if (j > 0) out += j + '斤';
+    if (l > 0) out += l + '兩';
+    return out || '0兩';
+  }
+  return val + ' ' + unit;
+};
 // 排程摘要：每個品項不可從中間斷行，只在「、」之後換行
 // 排程摘要若超過一行 → 日期欄靠上對齊；只有一行 → 上下置中
 window.schedAlignHeaders = function() {
@@ -3525,6 +3552,7 @@ function _liangToJinStrGlobal(liang) {
   liang = Math.round(liang * 10) / 10;
   var j = Math.floor(liang / 16);
   var l = Math.round((liang - j * 16) * 10) / 10;
+  if (j > 0 && l % 1 !== 0) { l = Math.ceil(l); if (l >= 16) { j += 1; l = 0; } } // 有斤有兩且兩有小數 → 兩無條件進位
   var s = '';
   if (j > 0) s += j + '斤';
   if (l > 0) s += l + '兩';
@@ -9530,8 +9558,8 @@ function recalcOilySeasoning() {
     html += '<div id="sched-mushroom-sauce-' + dateKey + '"></div>';
     html += '<div id="sched-black-pepper-sauce-' + dateKey + '"></div>';
     html += '<div id="sched-red-sauce-recipe-' + dateKey + '"></div>';
-    html += '<div id="sched-chili-sauce-' + dateKey + '"></div>';
     html += '<div id="sched-minced-recipe-' + dateKey + '"></div>';
+    html += '<div id="sched-chili-sauce-' + dateKey + '"></div>';
     html += '<div id="sched-lotus-monkey-' + dateKey + '"></div>';
     html += '<div id="sched-fried-mushr-' + dateKey + '"></div>';
     html += '<div id="sched-mushr-shred-' + dateKey + '"></div>';
@@ -10565,6 +10593,7 @@ function recalcOilySeasoning() {
     liang = Math.round(liang * 10) / 10;
     var j = Math.floor(liang / 16);
     var l = Math.round((liang - j * 16) * 10) / 10;
+    if (j > 0 && l % 1 !== 0) { l = Math.ceil(l); if (l >= 16) { j += 1; l = 0; } } // 有斤有兩且兩有小數 → 兩無條件進位
     var s = '';
     if (j > 0) s += j + '斤';
     if (l > 0) s += l + '兩';
@@ -10808,7 +10837,7 @@ function recalcOilySeasoning() {
     SG.forEach(function(item) {
       h += '<div style="background:var(--paper);border:1px solid #ffb74d;border-radius:5px;padding:5px 10px;text-align:center;min-width:72px">'
         + '<div style="font-size:10px;color:var(--ink3)">' + item.name + '</div>'
-        + '<div style="font-size:13px;font-weight:700;color:#e65100">' + item.val + ' ' + item.unit + '</div>'
+        + '<div style="font-size:13px;font-weight:700;color:#e65100">' + window.fmtJinLiang(item.val, item.unit) + '</div>'
         + '</div>';
     });
     h += '</div></div>';
@@ -11141,7 +11170,7 @@ function recalcOilySeasoning() {
         var sub = d.sub ? '<div style="font-size:10px;color:#b45309">' + d.sub + '</div>' : '';
         disp = '<div style="font-size:13px;font-weight:700;color:'+color+'">' + d.main + '</div>' + sub;
       } else {
-        disp = '<div style="font-size:13px;font-weight:700;color:'+color+'">' + item.val + ' ' + item.unit + '</div>';
+        disp = '<div style="font-size:13px;font-weight:700;color:'+color+'">' + window.fmtJinLiang(item.val, item.unit) + '</div>';
       }
       h += '<div style="background:var(--paper);border:1px solid '+border+';border-radius:5px;padding:5px 10px;text-align:center;min-width:72px">'
         + '<div style="font-size:10px;color:var(--ink3)">' + item.name + '</div>'
@@ -11189,7 +11218,7 @@ function recalcOilySeasoning() {
         var sub = d.sub ? '<div style="font-size:10px;color:#b45309">' + d.sub + '</div>' : '';
         disp = '<div style="font-size:13px;font-weight:700;color:'+color+'">' + d.main + '</div>' + sub;
       } else {
-        disp = '<div style="font-size:13px;font-weight:700;color:'+color+'">' + item.val + ' ' + item.unit + '</div>';
+        disp = '<div style="font-size:13px;font-weight:700;color:'+color+'">' + window.fmtJinLiang(item.val, item.unit) + '</div>';
       }
       h += '<div style="background:var(--paper);border:1px solid '+border+';border-radius:5px;padding:5px 10px;text-align:center;min-width:72px">'
         + '<div style="font-size:10px;color:var(--ink3)">' + item.name + '</div>'
@@ -11279,7 +11308,7 @@ function recalcOilySeasoning() {
         var sub = d.sub ? '<div style="font-size:10px;color:#b45309">' + d.sub + '</div>' : '';
         disp = '<div style="font-size:13px;font-weight:700;color:'+color+'">' + d.main + '</div>' + sub;
       } else {
-        disp = '<div style="font-size:13px;font-weight:700;color:'+color+'">' + item.val + ' ' + item.unit + '</div>';
+        disp = '<div style="font-size:13px;font-weight:700;color:'+color+'">' + window.fmtJinLiang(item.val, item.unit) + '</div>';
       }
       h += '<div style="background:var(--paper);border:1px solid '+border+';border-radius:5px;padding:5px 10px;text-align:center;min-width:68px">'
         + '<div style="font-size:10px;color:var(--ink3)">' + item.name + '</div>'
@@ -11299,7 +11328,7 @@ function recalcOilySeasoning() {
         var sub = d.sub ? '<div style="font-size:10px;color:#b45309">' + d.sub + '</div>' : '';
         disp = '<div style="font-size:13px;font-weight:700;color:'+color+'">' + d.main + '</div>' + sub;
       } else {
-        disp = '<div style="font-size:13px;font-weight:700;color:'+color+'">' + item.val + ' ' + item.unit + '</div>';
+        disp = '<div style="font-size:13px;font-weight:700;color:'+color+'">' + window.fmtJinLiang(item.val, item.unit) + '</div>';
       }
       h += '<div style="background:var(--paper);border:1px solid '+border+';border-radius:5px;padding:5px 10px;text-align:center;min-width:68px">'
         + '<div style="font-size:10px;color:var(--ink3)">' + item.name + '</div>'
@@ -11390,6 +11419,12 @@ function recalcOilySeasoning() {
     var el = document.getElementById('sched-minced-recipe-' + dateKey);
     if (!el) return;
     var it = items && items.find(function(x){ return x.prod === 'minced' && parseFloat(x.qty) > 0; });
+    // 當天排了辣椒醬但沒排素肉燥：也顯示素肉燥斤兩（辣椒醬每鍋用素肉燥1鍋量，顯示在辣椒醬前面）
+    var forChili = false;
+    if (!it) {
+      it = items && items.find(function(x){ return x.prod === 'minced_chili' && parseFloat(x.qty) > 0; });
+      forChili = !!it;
+    }
     if (!it) { el.innerHTML = ''; return; }
     var pots = parseFloat(it.qty) || 0;
     if (pots <= 0) { el.innerHTML = ''; return; }
@@ -11411,27 +11446,49 @@ function recalcOilySeasoning() {
       { name:'甘草粉', val:'2', unit:'兩' },
     ];
     var color = '#bf360c'; var bg1 = '#fbe9e7'; var bg2 = '#ffccbc'; var border = '#ffab91';
-    var h = '<div style="margin-top:12px;background:linear-gradient(135deg,'+bg1+','+bg2+');border:1px solid '+border+';border-radius:8px;padding:12px">';
-    h += '<div style="font-size:12px;font-weight:700;color:var(--ink2);margin-bottom:6px;letter-spacing:1px">🍖 祥順素肉燥・1鍋量配方（共 <span style="color:var(--red)">' + pots + '</span> 鍋）</div>';
-    h += '<div style="display:flex;flex-wrap:wrap;gap:6px">';
-    MC.forEach(function(item) {
-      var disp;
-      if (item.unit === '兩' && CONDIMENT_PACK_CFG[item.name]) {
-        var d = condimentDisplayDual(item.name, parseFloat(item.val), null);
-        var sub = d.sub ? '<div style="font-size:10px;color:#b45309">' + d.sub + '</div>' : '';
-        disp = '<div style="font-size:13px;font-weight:700;color:'+color+'">' + d.main + '</div>' + sub;
-      } else if (item.unit === '斤' && CONDIMENT_PACK_CFG[item.name]) {
-        var d = condimentDisplayDual(item.name, null, parseFloat(item.val));
-        var sub = d.sub ? '<div style="font-size:10px;color:#b45309">' + d.sub + '</div>' : '';
-        disp = '<div style="font-size:13px;font-weight:700;color:'+color+'">' + d.main + '</div>' + sub;
-      } else {
-        disp = '<div style="font-size:13px;font-weight:700;color:'+color+'">' + item.val + ' ' + item.unit + '</div>';
-      }
-      h += '<div style="background:var(--paper);border:1px solid '+border+';border-radius:5px;padding:5px 10px;text-align:center;min-width:68px">'
-        + '<div style="font-size:10px;color:var(--ink3)">' + item.name + '</div>'
-        + disp + '</div>';
-    });
-    h += '</div></div>';
+    function gridHtml(list) {
+      var g = '<div style="display:flex;flex-wrap:wrap;gap:6px">';
+      list.forEach(function(item) {
+        var disp;
+        if (item.unit === '兩' && CONDIMENT_PACK_CFG[item.name]) {
+          var d = condimentDisplayDual(item.name, parseFloat(item.val), null);
+          var sub = d.sub ? '<div style="font-size:10px;color:#b45309">' + d.sub + '</div>' : '';
+          disp = '<div style="font-size:13px;font-weight:700;color:'+color+'">' + d.main + '</div>' + sub;
+        } else if (item.unit === '斤' && CONDIMENT_PACK_CFG[item.name]) {
+          var d = condimentDisplayDual(item.name, null, parseFloat(item.val));
+          var sub = d.sub ? '<div style="font-size:10px;color:#b45309">' + d.sub + '</div>' : '';
+          disp = '<div style="font-size:13px;font-weight:700;color:'+color+'">' + d.main + '</div>' + sub;
+        } else {
+          disp = '<div style="font-size:13px;font-weight:700;color:'+color+'">' + window.fmtJinLiang(item.val, item.unit) + '</div>';
+        }
+        g += '<div style="background:var(--paper);border:1px solid '+border+';border-radius:5px;padding:5px 10px;text-align:center;min-width:68px">'
+          + '<div style="font-size:10px;color:var(--ink3)">' + item.name + '</div>'
+          + disp + '</div>';
+      });
+      return g + '</div>';
+    }
+    var h = '<div data-minced-card="1" style="margin-top:12px;background:linear-gradient(135deg,'+bg1+','+bg2+');border:1px solid '+border+';border-radius:8px;padding:12px">';
+    if (!forChili) {
+      h += '<div style="font-size:12px;font-weight:700;color:var(--ink2);margin-bottom:6px;letter-spacing:1px">🍖 祥順素肉燥・1鍋量配方（共 <span style="color:var(--red)">' + pots + '</span> 鍋）</div>';
+      h += gridHtml(MC);
+    } else {
+      // 辣椒醬用：每鍋辣椒醬用素肉燥 21kg，1鍋素肉燥約 70kg → 0.3 鍋；可切換「0.3鍋」與「原斤兩（1鍋）」，預設 0.3 鍋
+      var potsC = Math.round(pots * 0.3 * 100) / 100;
+      var MC3 = MC.map(function(m) {
+        return { name: m.name, val: String(Math.round(parseFloat(m.val) * potsC * 100) / 100), unit: m.unit };
+      });
+      var bOn  = 'background:#bf360c;color:#fff;';
+      var bOff = 'background:transparent;color:#bf360c;';
+      var bBase = 'font-size:12px;font-weight:700;padding:4px 14px;border-radius:999px;border:none;cursor:pointer;white-space:nowrap;';
+      h += '<div style="font-size:12px;font-weight:700;color:var(--ink2);margin-bottom:6px;letter-spacing:1px">🍖 祥順素肉燥・<span data-mview-title="03">辣椒醬用量（共 <span style="color:var(--red)">' + potsC + '</span> 鍋）</span><span data-mview-title="full" style="display:none">原斤兩・1鍋量配方</span></div>';
+      h += '<div style="display:inline-flex;gap:2px;padding:2px;margin-bottom:8px;background:#fff;border:1px solid #ffab91;border-radius:999px">'
+        + '<button type="button" data-mview-btn="03" style="' + bBase + bOn + '" onclick="window.mincedCardView(this,\'03\')">' + potsC + ' 鍋</button>'
+        + '<button type="button" data-mview-btn="full" style="' + bBase + bOff + '" onclick="window.mincedCardView(this,\'full\')">1 鍋</button>'
+        + '</div>';
+      h += '<div data-mview="03">' + gridHtml(MC3) + '<div style="margin-top:8px;font-size:11px;color:var(--ink3)">備註：原斤兩 1 鍋約 70 kg</div></div>';
+      h += '<div data-mview="full" style="display:none">' + gridHtml(MC) + '</div>';
+    }
+    h += '</div>';
     el.innerHTML = h;
   }
 
@@ -11456,7 +11513,7 @@ function recalcOilySeasoning() {
     OG.forEach(function(item) {
       h += '<div style="background:var(--paper);border:1px solid '+border+';border-radius:5px;padding:5px 10px;text-align:center;min-width:76px">'
         + '<div style="font-size:10px;color:var(--ink3)">' + item.name + '</div>'
-        + '<div style="font-size:13px;font-weight:700;color:'+color+'">' + item.val + ' ' + item.unit + '</div>'
+        + '<div style="font-size:13px;font-weight:700;color:'+color+'">' + window.fmtJinLiang(item.val, item.unit) + '</div>'
         + '</div>';
     });
     h += '</div></div>';
@@ -11487,7 +11544,7 @@ function recalcOilySeasoning() {
     CS.forEach(function(item) {
       h += '<div style="background:var(--paper);border:1px solid '+border+';border-radius:5px;padding:5px 10px;text-align:center;min-width:76px">'
         + '<div style="font-size:10px;color:var(--ink3)">' + item.name + '</div>'
-        + '<div style="font-size:13px;font-weight:700;color:'+color+'">' + item.val + ' ' + item.unit + '</div>'
+        + '<div style="font-size:13px;font-weight:700;color:'+color+'">' + window.fmtJinLiang(item.val, item.unit) + '</div>'
         + '</div>';
     });
     h += '</div></div>';
@@ -14604,8 +14661,8 @@ function recalcOilySeasoning() {
       'sched-mushroom-sauce-',
       'sched-black-pepper-sauce-',
       'sched-red-sauce-recipe-',
-      'sched-chili-sauce-',
       'sched-minced-recipe-',
+      'sched-chili-sauce-',
       'sched-lotus-monkey-',
       'sched-fried-mushr-',
       'sched-mushr-shred-',
