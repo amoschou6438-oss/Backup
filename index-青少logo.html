@@ -479,6 +479,12 @@
   .fab-menu.open .fab-home { transform: translateY(-70px) scale(1); transition-delay: 0s; }
   .fab-menu.open .fab-top  { transform: translateY(-140px) scale(1); transition-delay: 0.05s; }
   .fab-item:active { filter: brightness(0.92); }
+  /* 已在頁面頂端時，「到頂端」不可按 */
+  .fab-menu .fab-item.fab-top:disabled {
+    opacity: 0.45 !important; filter: grayscale(1) !important;
+    cursor: not-allowed; box-shadow: none;
+  }
+  .fab-menu .fab-item.fab-top:disabled .fm-label { opacity: 0.6; }
   /* 可拖曳：按住 📂 移動；靠上時往下展開；靠左時標籤放右側 */
   .fab-main { touch-action: none; user-select: none; -webkit-user-select: none; cursor: grab; }
   .fab-menu.fm-dragging .fab-main { cursor: grabbing; transition: none; transform: scale(1.1); box-shadow: 0 10px 26px rgba(0,0,0,0.35); }
@@ -3831,15 +3837,35 @@ function goHome() {
 }
 
 // ── 右下角合併浮動選單：📂 展開（向上滑出主畫面／到頂端），📁 收起 ──
+// 是否已在頁面最頂端（容許 1~2px 的小數誤差）
+function isAtTop() {
+  const y = window.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop || 0;
+  return y < 2;
+}
+// 已在頂端時，「到頂端」按鈕反灰且不可按
+function updateFabTopState() {
+  const btn = document.querySelector('.fab-top');
+  if (!btn) return;
+  const atTop = isAtTop();
+  btn.disabled = atTop;
+  btn.setAttribute('aria-disabled', atTop ? 'true' : 'false');
+  btn.title = atTop ? '已在頂端' : '到頂端';
+}
 function scrollToTop() {
+  if (isAtTop()) return;
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
+window.addEventListener('scroll', updateFabTopState, { passive: true });
+window.addEventListener('resize', updateFabTopState);
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', updateFabTopState);
+else updateFabTopState();
 function toggleFabMenu(force) {
   const menu = document.getElementById('fab-menu');
   const main = document.getElementById('fab-main');
   if (!menu || !main) return;
   const open = (typeof force === 'boolean') ? force : !menu.classList.contains('open');
   menu.classList.toggle('open', open);
+  if (open) updateFabTopState();
   main.textContent = open ? '📁' : '📂';
   main.title = open ? '收起選單' : '展開選單（可按住拖曳移動）';
   main.setAttribute('aria-label', open ? '收起選單' : '展開選單');
