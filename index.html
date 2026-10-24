@@ -287,8 +287,15 @@ const WRITERS = [
   classWriter('ztm', 'tmb_full_backup', 'tmb_data_main','tmb_monthly_record_v1', ['studentBirthdayExtra', 'parentBirthdayExtra']),
 
   { appId:'sb', detect: p => p.type === 'sanban_roster_export',
-    count: p => keysN(p.data) + ' 組名單資料',
-    apply: (p, io) => { if (!isObj(p.data)) throw new Error('備份檔內沒有 data 欄位'); io.set('sanban_roster_state_v1', p.data); } },
+    count: p => ['child','youth','elder'].reduce((n,k) => n + (Array.isArray(p.roster && p.roster[k]) ? p.roster[k].length : 0), 0) + ' 位人員',
+    // 三班系統的名單儲存在 sanban_roster_members_v1（格式 {child, youth, elder}）；
+    // sanban_roster_state_v1 是出席/便當狀態，不可寫入名單。
+    apply: (p, io) => {
+      if (!isObj(p.roster)) throw new Error('備份檔內沒有 roster 欄位');
+      const r = {}; let n = 0;
+      ['child','youth','elder'].forEach(k => { if (Array.isArray(p.roster[k]) && p.roster[k].length) { r[k] = p.roster[k]; n += r[k].length; } });
+      if (!n) throw new Error('備份檔內找不到人員名單');
+      io.set('sanban_roster_members_v1', r); } },
 
   // 茶會帳本的備份檔沒有標記，以內容（members + records，且不是班級備份）判斷
   { appId:'th', detect: p => Array.isArray(p.members) && Array.isArray(p.records) && !p.exportType,
