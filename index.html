@@ -11,6 +11,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="備份控制台">
 <meta name="theme-color" content="#182625">
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&family=ZCOOL+QingKe+HuangYou&display=swap" rel="stylesheet">
 <style>
@@ -148,7 +149,7 @@
   <div class="notes">
     <b>備份</b>：每個項目開啟一個分頁，自動下載備份檔後關閉。<br>
     <b>恢復</b>：先找到該項目的「一鍵備份」JSON 檔，在跳出的畫面中選擇它。<br>
-    <b>寫入</b>：按「寫入GitHub」，選備份 JSON，按「確認寫入」即把資料直接寫進 GitHub 倉庫裡該頁面的 HTML，網址重新整理後就是新版（首次需到「設定」填權杖與倉庫）。<br>
+    <b>寫入</b>：按「寫入GitHub」，選備份 JSON（戶外活動餐點則選匯出的 Excel 報表），按「確認寫入」即把資料直接寫進 GitHub 倉庫裡該頁面的 HTML，網址重新整理後就是新版（首次需到「設定」填權杖與倉庫）。<br>
     手機瀏覽器若提示「已封鎖快顯視窗」，請選擇允許。
   </div>
 
@@ -169,7 +170,7 @@
     <button id="btn-backup">開始備份</button>
     <button id="btn-restore">開始恢復</button>
     <button id="btn-write">寫入GitHub</button>
-    <input type="file" id="w-file" accept=".json,application/json" multiple hidden>
+    <input type="file" id="w-file" accept=".json,application/json,.xlsx,.xls" multiple hidden>
   </div>
 </div>
 
@@ -282,6 +283,13 @@ const WRITERS = [
       io.set('inventory_count_state_v1', { v:1, time:new Date().toISOString(), data:p.data });
       io.set('inventory_count_backup_v1', { time:p.time, data:p.data }); } },
 
+
+  // 戶外活動餐點彙整：資料是直接寫在 HTML 的 ALL_AREAS_MEALS 陣列裡，不是存在瀏覽器；
+  // 選 Excel（含「總表」工作表）後，會把整個陣列換成 Excel 的內容。
+  { appId:'wildm', mode:'html', detect: p => p && p.__xlsxMeals,
+    count: p => p.rows.length + ' 筆餐點、' + new Set(p.rows.map(r => r.area)).size + ' 個區',
+    apply: () => {} },
+
   classWriter('xrb', 'xrb_full_backup', 'xrb_data_v2',  'xrb_monthly_record_v1', ['memberBirthdayExtra']),
   classWriter('xqs', 'qsb_full_backup', 'qsb_data',     'qsb_monthly_record_v1', ['studentBirthdayExtra', 'parentBirthdayExtra']),
   classWriter('ztm', 'tmb_full_backup', 'tmb_data_main','tmb_monthly_record_v1', ['studentBirthdayExtra', 'parentBirthdayExtra']),
@@ -330,9 +338,7 @@ const WRITERS = [
     } },
 ];
 
-const UNSUPPORTED = [
-  { detect: p => p.type === 'meal-entries-backup', why:'戶外活動餐點彙整的資料不是存在瀏覽器裡，無法用這個方式寫入' },
-];
+const UNSUPPORTED = [];
 
 // ---- 產生要插入 HTML 的區塊 ----
 const EMB_START = '<!--EMB-BACKUP-START-->', EMB_END = '<!--EMB-BACKUP-END-->';
@@ -350,6 +356,32 @@ function inject(html, block){
   const m = html.match(/<head[^>]*>/i);
   if (!m) throw new Error('HTML 內找不到 <head>');
   return html.replace(m[0], () => m[0] + '\n' + block);
+}
+
+// ---- 戶外餐點：Excel → ALL_AREAS_MEALS ----
+const MEAL_CATS = ['米飯類','麵食類','熟食類','熱湯類','炸物類','點心類','水果類','飲品類'];
+const MEAL_AREAS = ['台中區','彰化區','太平區','坪林區','嘉義區','斗六區','馬光區','苗栗區','北區'];
+function parseMealXlsx(buf){
+  if (typeof XLSX === 'undefined') throw new Error('Excel 元件載入失敗，請檢查網路後再試');
+  const wb = XLSX.read(buf, { type:'array' });
+  const ws = wb.Sheets['總表'];
+  if (!ws) throw new Error('Excel 內找不到「總表」工作表');
+  const t = v => v == null ? '' : String(v).trim();
+  const rows = XLSX.utils.sheet_to_json(ws, { defval:'' }).map(r => ({ area:t(r['區單位']), category:t(r['分類']), name:t(r['品名']), qty:t(r['數量']), vegType:t(r['素食別']), provider:t(r['提供前賢']), note:t(r['備註']) })).filter(r => r.area || r.name);
+  if (!rows.length) throw new Error('「總表」內沒有餐點資料');
+  const badCat = rows.find(r => MEAL_CATS.indexOf(r.category) < 0);
+  if (badCat) throw new Error('分類「' + badCat.category + '」不是有效分類');
+  const badArea = rows.find(r => MEAL_AREAS.indexOf(r.area) < 0);
+  if (badArea) throw new Error('區單位「' + badArea.area + '」不是有效區單位');
+  rows.sort((a, b) => MEAL_AREAS.indexOf(a.area) - MEAL_AREAS.indexOf(b.area) || MEAL_CATS.indexOf(a.category) - MEAL_CATS.indexOf(b.category));
+  return { __xlsxMeals:true, time:new Date().toISOString(), rows };
+}
+const jsq = s => "'" + String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\r?\n/g, ' ') + "'";
+function injectMeals(html, p){
+  const lines = p.rows.map(r => `  {area:${jsq(r.area)}, category:${jsq(r.category)}, name:${jsq(r.name)}, qty:${jsq(r.qty)}, vegType:${jsq(r.vegType)}, provider:${jsq(r.provider)}, note:${jsq(r.note)}},`).join('\n');
+  const re = /(const ALL_AREAS_MEALS = \[\n)[\s\S]*?(\n\];)/;
+  if (!re.test(html)) throw new Error('HTML 內找不到 ALL_AREAS_MEALS 陣列，請確認檔案路徑');
+  return html.replace(re, (m, a, b) => a + lines + b);
 }
 
 // ---- GitHub 設定（存在本機瀏覽器）----
@@ -377,8 +409,8 @@ async function bakeOne(it){
   const raw = await gh(cp, { headers:{ Accept:'application/vnd.github.raw+json' } });
   if (!raw.ok) throw new Error(httpMsg(raw.status));
   const old = await raw.text();
-  const io = makeIO(); it.w.apply(it.payload, io);
-  const next = inject(old, makeBlock(it.app.id, io.out));
+  const io = makeIO(); if (it.w.mode !== 'html') it.w.apply(it.payload, io);
+  const next = it.w.mode === 'html' ? injectMeals(old, it.payload) : inject(old, makeBlock(it.app.id, io.out));
   const put = await gh(cp, { method:'PUT', headers:{ Accept:'application/vnd.github+json', 'Content-Type':'application/json' },
     body:JSON.stringify({ message:`自動寫入備份資料（${it.app.name}）`, content:b64(next), sha:mj.sha }) });
   if (!put.ok) throw new Error(httpMsg(put.status));
@@ -397,7 +429,8 @@ document.getElementById('w-file').onchange = async e => {
   const best = {}, bad = [];
   for (const f of files) {
     try {
-      const p = JSON.parse(await f.text());
+      const isX = /\.xlsx?$/i.test(f.name);
+      const p = isX ? parseMealXlsx(await f.arrayBuffer()) : JSON.parse(await f.text());
       if (!isObj(p)) throw new Error('不是有效的備份檔');
       const un = UNSUPPORTED.find(u => u.detect(p));
       if (un) throw new Error(un.why);
