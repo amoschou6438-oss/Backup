@@ -106,7 +106,8 @@
     .subtab-btn { padding: 6px 10px; font-size: 0.74rem; }
     table { font-size: 0.85rem; }
     thead th:nth-child(2), tbody td:nth-child(2) { width: 72px; }
-    thead th:nth-child(3), tbody td:nth-child(3) { width: 32px; }
+    thead th:nth-child(3), tbody td:nth-child(3) { width: 66px; }
+    thead th:nth-child(4), tbody td:nth-child(4) { width: 32px; }
     thead th { padding: 8px 6px; }
     tbody td { padding: 8px 6px; }
     .name-cell { gap: 4px; }
@@ -116,6 +117,7 @@
   @media (max-width: 380px) {
     .home-wrap .home-title, .count-title { font-size: 1.8rem; }
     thead th:nth-child(2), tbody td:nth-child(2) { width: 62px; }
+    thead th:nth-child(3), tbody td:nth-child(3) { width: 58px; }
     table { font-size: 0.8rem; }
   }
   button:hover { background: var(--hover); }
@@ -325,7 +327,8 @@
   }
   thead th:nth-child(1), tbody td:nth-child(1) { width: auto; }
   thead th:nth-child(2), tbody td:nth-child(2) { width: 92px; }
-  thead th:nth-child(3), tbody td:nth-child(3) { width: 40px; }
+  thead th:nth-child(3), tbody td:nth-child(3) { width: 96px; }
+  thead th:nth-child(4), tbody td:nth-child(4) { width: 40px; }
   thead th {
     position: sticky;
     top: 0;
@@ -347,10 +350,16 @@
     white-space: nowrap;
     text-align: center;
   }
-  tbody td:nth-child(3) {
+  tbody td:nth-child(3), tbody td:nth-child(4) {
     white-space: nowrap;
     text-align: center;
   }
+  tbody td.conv-cell {
+    font-family: 'ZCOOL QingKe HuangYou', 'Noto Serif TC', 'Noto Sans TC', serif;
+    font-size: 1.25rem; letter-spacing: 1px; color: var(--gold); cursor: default;
+  }
+  tbody td.conv-cell.empty { color: var(--text-muted); opacity: .5; }
+  thead th:nth-child(3) { text-align: center; }
   tbody tr:hover { background: var(--hover); }
   tbody tr.zero-row { background: var(--zero-bg); }
   tbody tr.zero-row:hover { background: var(--zero-bg); filter: brightness(0.97); }
@@ -1011,6 +1020,18 @@
   .save-opt-t { display: block; font-size: 15px; font-weight: 700; }
   .save-opt-d { display: block; font-size: .74rem; font-weight: 500; color: var(--text-muted); margin-top: 3px; line-height: 1.5; }
   .save-cancel { display: block; width: 100%; margin-top: 12px; background: transparent; border-color: var(--border); color: var(--text-muted); }
+
+  /* ===== 盤點單位提示：顯示在品項名稱下方（不再從左側蓋住品名） ===== */
+  .name-cell { flex-wrap: wrap; }
+  .name-cell .hint-slot {
+    position: static; order: 99; flex: 0 0 100%; margin: 0; transform: none;
+    border-radius: 0; pointer-events: none; overflow: hidden;
+    max-height: 0; transition: max-height .26s cubic-bezier(.2,.8,.2,1), margin-top .26s ease;
+  }
+  tr.hint-open .name-cell .hint-slot { max-height: 40px; margin-top: 6px; }
+  .name-cell .hint-chip { display: inline-block; transform: translateY(-8px); }
+  tr.hint-open .name-cell .hint-chip { transform: translateY(0); }
+  @media (prefers-reduced-motion: reduce) { .name-cell .hint-slot { transition: none; } }
 </style>
 </head>
 <body>
@@ -1102,6 +1123,7 @@
           <tr>
             <th>貨品名稱</th>
             <th>盤點數量</th>
+            <th>換算數量</th>
             <th></th>
           </tr>
         </thead>
@@ -2450,7 +2472,6 @@ function renderTable() {
       else openRowHint(tr);
     });
 
-    hintBox.appendChild(hintSlot);
     hintBox.appendChild(hintIcon);
     wrap.appendChild(nameSpan);
     const noteText = getNameNote(row.name);
@@ -2471,6 +2492,7 @@ function renderTable() {
       wrap.classList.add('has-note');
     }
     wrap.appendChild(hintBox);
+    wrap.appendChild(hintSlot);   // 提示放在品名下方（獨立一行），不再蓋住品名
     tdName.appendChild(wrap);
 
     // 盤點數量欄
@@ -2616,8 +2638,28 @@ function renderTable() {
       reviveKeyboard();   // 按 ✓ 收起鍵盤後，讓下一格的游標與鍵盤直接出現
     });
 
+    // 換算數量欄：盤點數量 × 內包裝數量（與匯出 Excel 的「廠內庫存」相同算法），輸入時即時更新
+    const tdConv = document.createElement('td');
+    tdConv.className = 'conv-cell';
+    const refreshConv = () => {
+      let q = '';
+      if (!isMulti) {
+        const raw = row.count_qty;
+        const hasCount = !(raw === null || raw === undefined || String(raw).trim() === '');
+        q = hasCount ? exportQty(row) : '';
+      }
+      tdConv.textContent = (q === '' || q === null || q === undefined) ? '—' : String(q);
+      tdConv.classList.toggle('empty', tdConv.textContent === '—');
+      const inner = toNum(row.inner_qty);
+      tdConv.title = '盤點數量 × 內包裝數量' + ((inner !== null && inner !== 0) ? '（×' + inner + '）' : '（內包裝數量未設定，×1）');
+    };
+    refreshConv();
+    tr.addEventListener('input', refreshConv);
+    tr.addEventListener('focusout', () => setTimeout(refreshConv, 0));
+
     tr.appendChild(tdName);
     tr.appendChild(tdCount);
+    tr.appendChild(tdConv);
 
     const tdDel = document.createElement('td');
     const delBtn = document.createElement('button');
@@ -2651,7 +2693,7 @@ function renderTable() {
   if (rows.length === 0 || tbodyEl.children.length === 0) {
     const tr = document.createElement('tr');
     const td = document.createElement('td');
-    td.colSpan = 3;
+    td.colSpan = 4;
     td.style.textAlign = 'center';
     td.style.color = 'var(--text-muted)';
     td.style.padding = '24px';

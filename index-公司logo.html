@@ -1741,7 +1741,7 @@ window.zqARIn = function(id, v){ if (!window.zzIs(id)) return v; var n = parseFl
         <div class="input-block-title">🌿 主要原料</div>
         <div class="irow"><label>香菇頭</label><div class="ifield"><input type="number" id="home_inv_mushrHead" min="0" step="0.1" oninput="window.homeSyncStock('home_inv_mushrHead','nw_inv_mushrHead')"><span class="unit">斤</span></div><span class="home-est">下週預計剩 <b id="home_est_mushrHead">—</b> 斤</span></div>
         <div class="irow"><label>碎肉</label><div class="ifield"><input type="number" id="home_inv_mince" min="0" step="0.1" oninput="window.homeSyncStock('home_inv_mince','nw_inv_mince')"><span class="unit">斤</span></div><span class="home-est">下週預計剩 <b id="home_est_mince">—</b> 斤</span></div>
-        <div class="irow" id="home_mince_bonus_row" style="border-bottom:none;padding-top:0;display:none"><label style="display:flex;align-items:center;gap:8px;cursor:pointer;width:100%;font-size:14px;color:var(--gold)"><input type="checkbox" id="home_mince_dumpling_bonus" style="width:20px;height:20px;flex:0 0 auto;accent-color:var(--gold)" onchange="window.setMinceDumplingBonus(this.checked)"><span>下週有做香椿水餃（碎肉會多 56斤）</span></label></div>
+        <div class="irow" id="home_mince_bonus_row" style="border-bottom:none;padding-top:0;display:none"><label style="display:flex;align-items:center;gap:8px;cursor:pointer;width:100%;font-size:14px;color:var(--gold)"><input type="checkbox" id="home_mince_dumpling_bonus" style="width:20px;height:20px;flex:0 0 auto;accent-color:var(--gold)" onchange="window.setMinceDumplingBonus(this.checked)"><span>水餃碎肉多56斤</span></label></div>
         <div class="irow"><label>菜脯</label><div class="ifield"><input type="number" id="home_inv_radish" min="0" step="0.1" oninput="window.homeSyncStock('home_inv_radish','nw_inv_radish')"><span class="unit">斤</span></div><span class="home-est">下週預計剩 <b id="home_est_radish">—</b> 斤</span></div>
       </div>
 
@@ -1949,6 +1949,9 @@ window.zqARIn = function(id, v){ if (!window.zzIs(id)) return v; var n = parseFl
         <div class="irow"><label>油飯（盤）</label><div class="ifield"><input type="number" id="cw_q_oily_rice" value="0" min="0" oninput="this._cwManualEdit=true;saveInputs();recalcAllDebounced()" style="color:var(--red);font-weight:700"><span class="unit">盤</span></div></div>
         <div class="irow"><label>猴菇荷葉油飯（盤）</label><div class="ifield"><input type="number" id="cw_q_monkey_rice" value="0" min="0" oninput="this._cwManualEdit=true;saveInputs();recalcAllDebounced()" style="color:var(--red);font-weight:700"><span class="unit">盤</span></div></div>
       </div>
+
+      <!-- 本週隱藏欄位：素肉燥／辣椒醬／炒香菇頭絲／咖哩粉／胡椒鹽（由排程自動帶入，供一覽表與香菇頭需求計算） -->
+      <div style="display:none" aria-hidden="true"><input type="number" id="cw_q_minced" value="0"><input type="number" id="cw_q_minced_chili" value="0"><input type="number" id="cw_q_mushr_shred" value="0"><input type="number" id="cw_q_curry" value="0"><input type="number" id="cw_q_pepper_salt" value="0"></div>
   </div>
 
   <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:12px;align-items:start;--label-w:9.5em">
@@ -5889,7 +5892,7 @@ function recalcAll() {
   if (mc) {
     const triCookPotsM = triCookPots; // 已在外層計算
     const mHead = q.wontonFill * 15 + triCookPots * 2 + q.triNext * 2 + q.dumpXC * 2 + q.dumpHQFill * 15 + q.minced * 6 + chiliHeadCalc(window._overviewSource === 'nw' ? 'nw' : 'cur', q.mincedChili, q.minced).jin;
-    const mMince = q.wontonFill * 28 + triCookPots * 28 + q.dumpHQFill * 36 + q.triNext * 28;
+    const mMince = q.wontonFill * 28 + triCookPots * 28 + q.dumpHQFill * 36 + q.triNext * 28 + ((window._overviewSource === 'nw' && window.getMinceDumplingBonus && window.getMinceDumplingBonus()) ? 56 : 0);
     const mRadish = triCookPotsM * 10 + q.dumpXC * 3 + q.triNext * 10;
     // 庫存讀取：nw 模式時讀取庫存，優先使用本週預計剩快照（_curEstRem），已盤點則用盤點值
     var _nwCkIds = { 'nw_inv_mushrHead':'inv_mushrHead', 'nw_inv_mince':'inv_mince', 'nw_inv_radish':'inv_radish' };
@@ -6033,6 +6036,7 @@ function recalcAll() {
     if (triCookPots            > 0) minceParts.push(`三角圓${triCookPots}鍋×28`);
     if (q.dumpHQFill           > 0) minceParts.push(`紅麴水餃料${q.dumpHQFill}鍋×36`);
     if (q.triNext              > 0) minceParts.push(`下禮拜先備${q.triNext}鍋×28`);
+    if (window._overviewSource === 'nw' && window.getMinceDumplingBonus && window.getMinceDumplingBonus()) minceParts.push('水餃碎肉多56');
     if (zMince                 > 0) minceParts.push(totalZi > 0 ? `粽子菜脯料碎肉${zMince}斤（含庫存/油飯調整）` : `油飯需炒菜脯料碎肉${zMince}斤`);
     const detailM = minceParts.length > 0
       ? `<div style="font-size:10px;color:var(--ink3);font-weight:400">${minceParts.join(' + ')}</div>` : '';
@@ -6042,7 +6046,7 @@ function recalcAll() {
     const convertH = Math.ceil(needH/93); // 需補包數
     const estRemH = convertH > 0 ? (convertH * 93 - needH) : (invH - mHeadTotal >= 0 ? invH - mHeadTotal : 0);
     const convertM = Math.ceil(needM/75);
-    const minceDumplingBonus = (window._overviewSource === 'nw' && window.getMinceDumplingBonus && window.getMinceDumplingBonus()) ? 56 : 0;
+    const minceDumplingBonus = 0; // 水餃碎肉56斤已改為計入需求，不再加在預計剩餘量
     const estRemM = (convertM > 0 ? (convertM * 75 - needM) : (invM - mMinceTotal >= 0 ? invM - mMinceTotal : 0)) + minceDumplingBonus;
     const convertR = Math.ceil(needR/15);
     const estRemR = convertR > 0 ? (convertR * 15 - needR) : (invR - mRadish >= 0 ? invR - mRadish : 0);
@@ -6446,7 +6450,7 @@ function recalcAll() {
     var zMince2     = totalZi2 > 0 ? Math.ceil(256 * 3 * zRatio2 * 37.5 / 600) : 0;
 
     var mHead2   = q.wontonFill*15 + triCookPots*2 + q.triNext*2 + q.dumpXC*2 + q.dumpHQFill*15 + q.minced*6 + chiliHeadCalc(window._overviewSource === 'nw' ? 'nw' : 'cur', q.mincedChili, q.minced).jin + zMushrHead2;
-    var mMince2  = q.wontonFill*28 + triCookPots*28 + q.dumpHQFill*36 + q.triNext*28 + zMince2;
+    var mMince2  = q.wontonFill*28 + triCookPots*28 + q.dumpHQFill*36 + q.triNext*28 + zMince2 + ((window._overviewSource === 'nw' && window.getMinceDumplingBonus && window.getMinceDumplingBonus()) ? 56 : 0);
     var mRadish2 = triCookPots*10 + q.dumpXC*3 + q.triNext*10;
 
     // nw 模式時讀取庫存，優先使用本週預計剩快照（_curEstRem），已盤點則用盤點值
@@ -7543,7 +7547,7 @@ function buildDryGoodsSummaryText(totals, prefix) {
   var mHead = wontonFill*15 + triCookPots*2 + triNext*2 + dumpXC*2 +
               dumpHQFill*15 + minced*6 + chiliHeadCalc(p2 === 'nw' ? 'nw' : 'cur', mincedChili, minced).jin;
   // 碎肉需求(斤)
-  var mMince = wontonFill*28 + triCookPots*28 + dumpHQFill*36 + triNext*28;
+  var mMince = wontonFill*28 + triCookPots*28 + dumpHQFill*36 + triNext*28 + ((p2 === 'nw' && window.getMinceDumplingBonus && window.getMinceDumplingBonus()) ? 56 : 0);
   // 菜脯需求(斤)
   var mRadish = triCookPots*10 + dumpXC*3 + triNext*10;
 
@@ -9577,12 +9581,16 @@ function recalcOilySeasoning() {
       summaryRanked = summaryRanked.map(function(str, i){ return { r: (normalItems[i].prod === 'egg_crepe') ? 9999 : (normalItems[i].prod === 'fried_mushr') ? window.schedProdRank('triangle') + 0.3 : window.schedProdRank(normalItems[i].prod), s: str }; }); // 蛋餅皮固定顯示在最後
       var sjyLabel = (typeof getSanJiaoYuanLabel === 'function') ? getSanJiaoYuanLabel(dateKey) : '';
       if (sjyLabel) summaryRanked.push({ r: window.schedProdRank('triangle') + 0.4, s: redNums(sjyLabel) });
-      var zprLabel = (typeof getZongziPrepLabel === 'function') ? getZongziPrepLabel(dateKey) : '';
-      if (zprLabel) summaryRanked.push({ r: window.schedProdRank('zongzi_c') + 0.4, s: redNums(zprLabel) });
+      var zprLabel = (typeof getZongziPrepLabel === 'function') ? getZongziPrepLabel(dateKey, 'zha') : '';
+      if (zprLabel) summaryRanked.push({ r: window.schedProdRank('triangle') + 0.42, s: redNums(zprLabel) }); // 炸粽子料：三角圓之後、油飯備料之前
+      var zprTail = (typeof getZongziPrepLabel === 'function') ? getZongziPrepLabel(dateKey, 'tail') : '';
+      if (zprTail) summaryRanked.push({ r: 10000, s: redNums(zprTail) }); // 醃粽子料、備粽子料、調味料：放最後
       var glegSauceLabel = (typeof getGlegSaucePrepLabel === 'function') ? getGlegSaucePrepLabel(dateKey) : '';
       if (glegSauceLabel) summaryRanked.push({ r: window.schedProdRank('soup_refill') + 0.5, s: redNums(glegSauceLabel) });
       var oilyPrepLabel = (typeof getOilyRicePrepLabel === 'function') ? getOilyRicePrepLabel(dateKey) : '';
-      if (oilyPrepLabel) summaryRanked.push({ r: window.schedProdRank('monkey_rice') + 0.4, s: redNums(oilyPrepLabel) });
+      if (oilyPrepLabel) summaryRanked.push({ r: zprLabel ? window.schedProdRank('triangle') + 0.45 : window.schedProdRank('monkey_rice') + 0.4, s: redNums(oilyPrepLabel) });
+      var monkeyPrepLabel = (typeof getMonkeyPrepLabel === 'function') ? getMonkeyPrepLabel(dateKey) : '';
+      if (monkeyPrepLabel) summaryRanked.push({ r: (zprLabel ? window.schedProdRank('triangle') + 0.46 : window.schedProdRank('monkey_rice') + 0.41), s: redNums(monkeyPrepLabel) });
       var wontonSlurryLabel = (typeof getWontonSlurryPrepLabel === 'function') ? getWontonSlurryPrepLabel(dateKey) : '';
       if (wontonSlurryLabel) summaryRanked.push({ r: window.schedProdRank('wonton') + 0.4, s: redNums(wontonSlurryLabel) });
       var sugarWaterLabel = (typeof getSugarWaterPrepLabel === 'function') ? getSugarWaterPrepLabel(dateKey) : '';
@@ -9599,14 +9607,18 @@ function recalcOilySeasoning() {
       }
       var sjyLabelNI = (typeof getSanJiaoYuanLabel === 'function') ? getSanJiaoYuanLabel(dateKey) : '';
       if (sjyLabelNI) noItemParts.push(redNumsNI(sjyLabelNI));
-      var zprLabelNI = (typeof getZongziPrepLabel === 'function') ? getZongziPrepLabel(dateKey) : '';
+      var zprLabelNI = (typeof getZongziPrepLabel === 'function') ? getZongziPrepLabel(dateKey, 'zha') : '';
       if (zprLabelNI) noItemParts.push(redNumsNI(zprLabelNI));
       var glegSauceLabelNI = (typeof getGlegSaucePrepLabel === 'function') ? getGlegSaucePrepLabel(dateKey) : '';
       if (glegSauceLabelNI) noItemParts.push(redNumsNI(glegSauceLabelNI));
       var oilyPrepLabelNI = (typeof getOilyRicePrepLabel === 'function') ? getOilyRicePrepLabel(dateKey) : '';
       if (oilyPrepLabelNI) noItemParts.push(redNumsNI(oilyPrepLabelNI));
+      var monkeyPrepLabelNI = (typeof getMonkeyPrepLabel === 'function') ? getMonkeyPrepLabel(dateKey) : '';
+      if (monkeyPrepLabelNI) noItemParts.push(redNumsNI(monkeyPrepLabelNI));
       var wontonSlurryLabelNI = (typeof getWontonSlurryPrepLabel === 'function') ? getWontonSlurryPrepLabel(dateKey) : '';
       if (wontonSlurryLabelNI) noItemParts.push(redNumsNI(wontonSlurryLabelNI));
+      var zprTailNI = (typeof getZongziPrepLabel === 'function') ? getZongziPrepLabel(dateKey, 'tail') : '';
+      if (zprTailNI) noItemParts.push(redNumsNI(zprTailNI)); // 放最後
       if (noItemParts.length > 0) {
         html += '<span class="sched-summary">' + window.schedJoinItems(noItemParts, true) + '</span>';
       }
@@ -10012,6 +10024,11 @@ function recalcOilySeasoning() {
     if (!glegItem) { el.innerHTML = ''; return; }
 
     var pots = parseFloat(glegItem.qty) || 0;
+    // 「粉類多1鍋」勾選：當天沾粉、粉漿、打漿水、黏皮粉一律依（原鍋數 + 1）計算
+    var origPots = pots;
+    var extraPot = false;
+    try { extraPot = !!(schedData[dateKey] && schedData[dateKey].glegPowderExtraPot); } catch (e) {}
+    if (extraPot) pots += 1;
     // 優先使用排程日儲存的剩餘拌粉量；若為0則嘗試讀盤點庫存的G腿剩餘拌粉量
     var invPowderEl = document.getElementById('inv_gleg_powder_left_inv');
     var invPowderKg = invPowderEl ? (parseFloat(invPowderEl.value) || 0) : 0;
@@ -10073,7 +10090,7 @@ function recalcOilySeasoning() {
 
     // 打漿水 = (粉漿總重(g)/1000 + G腿拌粉(kg)) × 1.6
     var slurryWater  = ((Math.max(0, pots * r_batt_total - leftG) / 1000 + leftKg) * 1.6).toFixed(1);
-    var stickyPowder = (pots * 1.5).toFixed(1);
+    var stickyPowder = (origPots * 1.5).toFixed(1); // 黏皮粉不受「粉類多1鍋」影響，一律依原鍋數
 
     // 合計總重（粉漿已扣剩餘，再加回剩餘拌粉量 = 沾粉 + 完整粉漿）
     var grandTotal = (Math.round(pots * r_coat_total) + Math.max(0, Math.round(pots * r_batt_total - leftG)) + Math.round(leftG)).toLocaleString();
@@ -10090,7 +10107,7 @@ function recalcOilySeasoning() {
     }
 
     var h = '<div style="margin-top:12px;background:linear-gradient(135deg,#e8f5e9,#d4edda);border:1px solid #a8d5b5;border-radius:8px;padding:12px">';
-    h += '<div style="font-size:12px;font-weight:700;color:var(--ink2);margin-bottom:10px;letter-spacing:1px">🍗 G腿沾粉、粉漿用量（' + pots + ' 鍋）</div>';
+    h += '<div style="font-size:12px;font-weight:700;color:var(--ink2);margin-bottom:10px;letter-spacing:1px">🍗 G腿沾粉、粉漿用量（' + pots + ' 鍋' + (extraPot ? '＝原 ' + origPots + ' 鍋＋1' : '') + '）</div>';
 
     // 剩餘拌粉量輸入
     h += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;padding:8px 10px;background:rgba(255,255,255,0.7);border-radius:6px;border:1px dashed #a8d5b5">';
@@ -10100,6 +10117,11 @@ function recalcOilySeasoning() {
       + ' style="width:80px;padding:4px 8px;border:1px solid #a8d5b5;border-radius:4px;font-size:14px;font-weight:700;color:var(--red);text-align:center;background:#fffef9;font-family:\'Noto Sans TC\',sans-serif">';
     h += '<span style="font-size:12px;color:var(--ink3)">kg（粉漿將扣除此量）</span>';
     h += '</div>';
+
+    // 粉類多1鍋 勾選
+    h += '<label style="display:flex;align-items:center;gap:8px;margin-bottom:10px;padding:8px 10px;background:rgba(255,255,255,0.7);border-radius:6px;border:1px dashed #a8d5b5;cursor:pointer;font-size:13px;font-weight:700;color:var(--ink2)">'
+      + '<input type="checkbox" ' + (extraPot ? 'checked ' : '') + 'onchange="schedToggleGlegPowderExtra(\'' + dateKey + '\',this.checked,this)" style="width:20px;height:20px;flex:0 0 auto;accent-color:var(--green)">'
+      + '<span>粉類多1鍋<span style="font-weight:400;font-size:12px;color:var(--ink3)">（當天斤兩依原鍋數 ' + origPots + ' ＋1 計算）</span></span></label>';
 
     // Chips
     h += '<div style="display:flex;flex-wrap:wrap;gap:6px">';
@@ -10423,7 +10445,7 @@ function recalcOilySeasoning() {
     if (xcQty > 0) h += '香椿水餃 <strong style="color:var(--red)">' + xcQty + '</strong> 鍋';
     if (xcQty > 0 && hqQty > 0) h += '　＋　';
     if (hqQty > 0) h += '紅麴水餃 <strong style="color:var(--red)">' + hqQty + '</strong> 鍋';
-    h += '　→　合計 <strong style="color:var(--red)">' + totalPots + '</strong> 鍋' + (xcQty > 0 ? '<span style="font-size:11px;color:var(--red);margin-left:10px;font-weight:700">※碎肉拌好粉後1鍋約10斤8兩</span>' : '') + '</div>';
+    h += '　→　合計 <strong style="color:var(--red)">' + totalPots + '</strong> 鍋' + (xcQty > 0 ? '<br><span style="font-size:11px;color:var(--red);font-weight:700">※碎肉拌好粉後1鍋約9斤11兩（原10斤8兩）</span>' : '') + '</div>';
     // 只有紅麴水餃（無香椿水餃）時，僅顯示水、鹽、鮮味多、青線、勾芡水五項基本配方
     var dumpDataToRender = (xcQty === 0 && hqQty > 0)
       ? DUMP_DATA.filter(function(item) { return !item.perPot && !item.xcOnly; })
@@ -12938,7 +12960,7 @@ function recalcOilySeasoning() {
           var monkeyRawJin = Math.ceil(monkeyCooked * 110 / 108);
           h += '<div style="margin-top:2px"><b>🌿 猴菇用量</b>　';
           h += '未處理猴菇需求 <span style="color:var(--red);font-weight:700">' + monkeyRawJin + ' 斤</span>';
-          h += '　<span style="font-size:11px;color:var(--ink3)">（煮好 ' + monkeyCooked + ' 顆，' + dayInfo.monkey + ' 盤）</span>';
+          h += '　<span style="font-size:11px;color:var(--ink3)">（煮好 ' + monkeyCooked + ' 斤，' + dayInfo.monkey + ' 盤）</span>';
           h += '</div>';
 
           // ── 猴頭菇調味料 ──
@@ -12960,6 +12982,16 @@ function recalcOilySeasoning() {
       });
     });
   }
+
+  // 勾選／取消「粉類多1鍋」：記錄在排程日資料，並重繪當日G腿沾粉、粉漿面板
+  window.schedToggleGlegPowderExtra = function(dateKey, checked, srcEl) {
+    if (!schedData[dateKey]) schedData[dateKey] = { items:[], note:'' };
+    schedData[dateKey].glegPowderExtraPot = !!checked;
+    schSave();
+    var dayRec = schedData[dateKey] || { items:[], note:'' };
+    var panelEl = (srcEl && srcEl.closest) ? srcEl.closest('[data-gleg-powder-panel]') : null;
+    renderGlegPowderPanel(dateKey, dayRec.items, dayRec.glegPowderLeft, panelEl || undefined);
+  };
 
   // 儲存排程日的剩餘拌粉量，並同步到製作數量輸入的 q_gleg_powder_left
   window.schedSaveGlegPowderLeft = function(dateKey, val, srcEl) {
@@ -13176,13 +13208,16 @@ function recalcOilySeasoning() {
         });
         var sjyL = (typeof getSanJiaoYuanLabel  === 'function') ? getSanJiaoYuanLabel(dk)  : '';
         if (sjyL)  parts.push(sjyL);
-        var zprL = (typeof getZongziPrepLabel   === 'function') ? getZongziPrepLabel(dk)   : '';
+        var zprL = (typeof getZongziPrepLabel   === 'function') ? getZongziPrepLabel(dk, 'zha')   : '';
         if (zprL)  parts.push(zprL);
         var glegL= (typeof getGlegSaucePrepLabel=== 'function') ? getGlegSaucePrepLabel(dk): '';
         if (glegL) parts.push(glegL);
         var oilyL= (typeof getOilyRicePrepLabel === 'function') ? getOilyRicePrepLabel(dk) : '';
         if (oilyL) parts.push(oilyL);
+        var monkeyL= (typeof getMonkeyPrepLabel === 'function') ? getMonkeyPrepLabel(dk) : '';
+        if (monkeyL) parts.push(monkeyL);
         (function(){ var ei = normItems.findIndex(function(it){return it.prod==='egg_crepe';}); if (ei >= 0 && ei < parts.length) { var ep = parts.splice(ei,1)[0]; parts.push(ep); } })();
+        (function(){ var tl = (typeof getZongziPrepLabel === 'function') ? getZongziPrepLabel(dk, 'tail') : ''; if (tl) parts.push(tl); })(); // 醃粽子料、備粽子料、調味料放最後
         if (parts.length > 0) {
           var icon = h.querySelector('.sched-toggle-icon');
           var sum  = document.createElement('span');
@@ -13274,7 +13309,7 @@ function recalcOilySeasoning() {
         var sjyLabel2 = (typeof getSanJiaoYuanLabel === 'function') ? getSanJiaoYuanLabel(dateKey) : '';
         if (sjyLabel2) parts2.push(sjyLabel2);
         // ── 粽子前置提醒追加 ──
-        var zprLabel2 = (typeof getZongziPrepLabel === 'function') ? getZongziPrepLabel(dateKey) : '';
+        var zprLabel2 = (typeof getZongziPrepLabel === 'function') ? getZongziPrepLabel(dateKey, 'zha') : '';
         if (zprLabel2) parts2.push(zprLabel2);
         // ── G腿醬備料文字提示追加 ──
         var glegSauceLabel2 = (typeof getGlegSaucePrepLabel === 'function') ? getGlegSaucePrepLabel(dateKey) : '';
@@ -13282,10 +13317,13 @@ function recalcOilySeasoning() {
         // ── 油飯備料文字提示追加 ──
         var oilyPrepLabel2 = (typeof getOilyRicePrepLabel === 'function') ? getOilyRicePrepLabel(dateKey) : '';
         if (oilyPrepLabel2) parts2.push(oilyPrepLabel2);
+        var monkeyPrepLabel2 = (typeof getMonkeyPrepLabel === 'function') ? getMonkeyPrepLabel(dateKey) : '';
+        if (monkeyPrepLabel2) parts2.push(monkeyPrepLabel2);
         var sugarWaterLabel2 = (typeof getSugarWaterPrepLabel === 'function') ? getSugarWaterPrepLabel(dateKey) : '';
         if (sugarWaterLabel2) parts2.push(sugarWaterLabel2);
         // 補湯備料提示（已改為在隔天面板顯示斤兩，summary 不再重複顯示）
         (function(){ var ei = normItems2.findIndex(function(it){return it.prod==='egg_crepe';}); if (ei >= 0 && ei < parts2.length) { var ep = parts2.splice(ei,1)[0]; parts2.push(ep); } })(); // 蛋餅皮文字放最後
+        (function(){ var tl2 = (typeof getZongziPrepLabel === 'function') ? getZongziPrepLabel(dateKey, 'tail') : ''; if (tl2) parts2.push(tl2); })(); // 醃粽子料、備粽子料、調味料放最後
         sum.innerHTML = window.schedJoinItems(parts2, false);
         header.querySelector('.sched-day-header').insertBefore(sum, icon);
         // 自動縮小摘要字體
@@ -13737,7 +13775,7 @@ function recalcOilySeasoning() {
   //       若上一週最後工作天有G腿排程 → 固定在生產日前一天（日曆日）
   //       若上一週最後工作天無G腿排程 → 安排在上一週最後工作天
   //     生產日：得來素粽子
-  function getZongziPrepLabel(dateKey) {
+  function getZongziPrepLabel(dateKey, mode) {  // mode: 'zha'＝只回傳炸粽子料；'tail'＝只回傳醃粽子料、備粽子料、調味料（排在最後）；省略＝全部
     schLoad();
 
     // ── 工具函式 ──
@@ -13907,7 +13945,7 @@ function recalcOilySeasoning() {
           beiDay = subWorkDays(prodDay, 1);
         }
         if (beiDay === dateKey) {
-          labels.push('🍙 備粽子料調味料');
+          labels.push('🍙 備粽子料、調味料');
           break; // 只標一次（最近的那個粽子生產日）
         }
       }
@@ -13947,6 +13985,8 @@ function recalcOilySeasoning() {
       }
     })();
 
+    if (mode === 'zha')  labels = labels.filter(function(l){ return l.indexOf('炸粽子料') >= 0; });
+    if (mode === 'tail') labels = labels.filter(function(l){ return l.indexOf('炸粽子料') < 0; });
     return labels.join('、');
   }
 
@@ -14053,6 +14093,24 @@ function recalcOilySeasoning() {
     }
     if (mushDays <= 0 && dumpDays <= 0) return '';
     return '🍯 煮糖水' + (mushDays > 0 ? (5 * mushDays) + '斤' : '') + (dumpDays > 0 ? '、備鹽巴' : '');
+  }
+
+  // ── 拌猴菇、炸猴菇提示（排程摘要用）──
+  // 下一個工作日有猴菇荷葉油飯 → 當天顯示「拌猴菇、炸猴菇」
+  function getMonkeyPrepLabel(dateKey) {
+    schLoad();
+    var d = new Date(dateKey + 'T00:00:00');
+    for (var i = 1; i <= 7; i++) {
+      d.setDate(d.getDate() + 1);
+      var wd = d.getDay();
+      if (wd !== 0 && wd !== 6) break;
+    }
+    var nextDk = fmtDate(d.getFullYear(), d.getMonth()+1, d.getDate());
+    var rec = schedData[nextDk];
+    if (!rec || !rec.items) return '';
+    var q = 0;
+    rec.items.forEach(function(it) { if (it.prod === 'monkey_rice') q += parseFloat(it.qty) || 0; });
+    return q > 0 ? '🌿 拌猴菇、炸猴菇' : '';
   }
 
   // ── 油飯備料文字提示（排程摘要用）──
@@ -16029,9 +16087,13 @@ riceSeaLoadAll();
 
     // 掃描所有排程日期，找出「今天（含）之前」且「尚未扣除」的有餛飩/餛飩料的日期
     var toDeduct = []; // [{ dateKey, qty }]
+    var weekMonKey = getWeekMondayKey(now);
+    var staleDates = [];
     Object.keys(schedData).forEach(function(dk) {
       if (dk > todayKey) return; // 未來的跳過
       if (deductedDates.indexOf(dk) >= 0) return; // 已扣過的跳過
+      // 上週（含更早）的排程：冷凍庫存已由實際盤點反映，不再扣除，也不會標記「已扣除本週量」
+      if (dk < weekMonKey) { staleDates.push(dk); return; }
       var rec = schedData[dk];
       if (!rec || !rec.items) return;
       var dayQty = 0;
@@ -16044,6 +16106,10 @@ riceSeaLoadAll();
       if (dayQty > 0) toDeduct.push({ dateKey: dk, qty: dayQty });
     });
 
+    if (staleDates.length) {
+      staleDates.forEach(function(dk) { if (deductedDates.indexOf(dk) < 0) deductedDates.push(dk); });
+      saveDeductedDates(deductedDates);
+    }
     if (toDeduct.length === 0) return;
 
     // 計算總扣除量
@@ -16111,13 +16177,13 @@ riceSeaLoadAll();
       weekKeys.push(fmtDate(d));
     }
     var curTotal = getWeekWontonTotal(weekKeys, schedData);
-    if (curTotal <= 0) return; // 本週沒有餛飩排程，維持原狀不動
+    // 不論本週有沒有餛飩排程，進入新的一週一律回復為「尚未扣除」
 
     // 回復為「尚未扣除」
     try { localStorage.removeItem(DEDUCT_FLAG_KEY); } catch(e) {}
     if (typeof _wontonCurDeductRender === 'function') _wontonCurDeductRender();
     if (typeof recalcAll === 'function') { try { recalcAll(); } catch(e) {} }
-    console.log('[餛飩冷凍] 已進入新的一週（' + curWeekKey + '），本週排程有餛飩，自動回復「這禮拜用量」為尚未扣除');
+    console.log('[餛飩冷凍] 已進入新的一週（' + curWeekKey + '），自動回復「這禮拜用量」為尚未扣除');
   }
 
   function tick() {
@@ -21064,6 +21130,7 @@ function debugFixNow() {
     }
   }, 0);
 
+
   window.getMinceDumplingBonus = function() {
     if (!window.nwHasDumplings()) return false;
     try { return localStorage.getItem('mince_dumpling_bonus') === '1'; } catch(e) { return false; }
@@ -21072,12 +21139,12 @@ function debugFixNow() {
     try { localStorage.setItem('mince_dumpling_bonus', on ? '1' : '0'); } catch(e) {}
     var cb = document.getElementById('home_mince_dumpling_bonus');
     if (cb) cb.checked = !!on;
-    // 立即反映在視窗的碎肉預計剩（先即時 ±56，再由完整重算校正為精確值）
+    // 先即時調整視窗內碎肉預計剩（勾選 -56、取消 +56），再由完整重算校正為精確值
     try {
       var _d = document.getElementById('home_est_mince');
       var _wasOn = window._homeBonusShown === true;
       if (_d && !isNaN(parseFloat(_d.textContent)) && _wasOn !== !!on) {
-        _d.textContent = Math.round((parseFloat(_d.textContent) + (on ? 56 : -56)) * 10) / 10;
+        _d.textContent = Math.round((parseFloat(_d.textContent) + (on ? -56 : 56)) * 10) / 10;
       }
       window._homeBonusShown = !!on;
     } catch(e) {}
