@@ -3171,7 +3171,10 @@ function toggleAreaDropdown(e) {
 
 function selectBentoArea(areaName) {
   applyBentoArea(areaName);
-  localStorage.setItem(LS_AREA_KEY, areaName);
+  try {
+    const _d = new Date();
+    localStorage.setItem(LS_AREA_KEY, JSON.stringify({m:_d.getFullYear()+'-'+(_d.getMonth()+1), a:areaName}));
+  } catch(e) {}
   const dd = document.getElementById('bento-area-dropdown');
   if (dd) dd.style.display = 'none';
 }
@@ -3188,10 +3191,18 @@ buildAreaDropdown();
 
 // 決定初始負責區：優先用 localStorage 手動設定，否則按月份自動推算
 (function() {
-  const saved = localStorage.getItem(LS_AREA_KEY);
-  if (saved) { applyBentoArea(saved); return; }
   const _nowDate = new Date();
   const _nowY = _nowDate.getFullYear(), _nowM = _nowDate.getMonth()+1;
+  // 手動設定只在當月有效；跨月或舊格式資料一律清除，改回自動推算
+  try {
+    const raw = localStorage.getItem(LS_AREA_KEY);
+    if (raw) {
+      let obj = null;
+      try { obj = JSON.parse(raw); } catch(e) {}
+      if (obj && obj.m === (_nowY + '-' + _nowM) && obj.a) { applyBentoArea(obj.a); return; }
+      localStorage.removeItem(LS_AREA_KEY);
+    }
+  } catch(e) {}
   const _mIdx = _bentoMonths.findIndex(x=>x.year===_nowY && x.month===_nowM);
   if (_mIdx === -1) {
     applyBentoArea('本月不輪流');
